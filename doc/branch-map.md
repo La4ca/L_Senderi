@@ -2,7 +2,7 @@
 
 These 33 task branches were created locally and pushed to GitHub from `main` at commit `9a5ef39`. Each branch tracks the matching `origin/` branch. The task definitions and dependencies are in [Milestones and assignments](milestones.md); the smaller steps are in [Task checklist](task-checklist.md).
 
-The branches are empty starting points. Before the first task commit, update local `main`, switch to the task branch, and fast-forward it to current `main`. In particular, include the reviewed `docs/task-breakdown` changes after they merge. Do not open a feature pull request until its task has actual work and its documented dependencies are merged.
+The branches were created as empty starting points. Before the first task commit, update local `main`, switch to the task branch, and fast-forward it to current `main`. In particular, include the reviewed `docs/task-breakdown` changes after they merge. Do not open a feature pull request until its task has actual work and its documented dependencies are merged.
 
 | Task | Branch |
 | --- | --- |

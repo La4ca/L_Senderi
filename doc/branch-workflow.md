@@ -8,7 +8,7 @@ The repository begins with an empty `main`. The initial documentation commit est
 - Open a pull request into `main`. Link its milestone, describe behavior and contract changes, and include test evidence. Split a large milestone into multiple feature branches rather than keeping one branch open throughout the milestone.
 - Jan reviews Laica's pull requests; Laica reviews Jan's. Require one approval and passing CI before squash merging. Resolve review comments on the branch, then sync with current `main` before merging.
 - Configure GitHub branch protection or a ruleset for `main` when the remote repository is available: block direct pushes, require a pull request, one peer approval, and the CI checks. Administrators should follow the same path.
-- Do not create a permanent `develop` or milestone branch. The initial task branches are empty and may become behind `main`; before the first task commit, fast-forward the selected branch from updated `main`. Merged task branches can be deleted.
+- Do not create a permanent `develop` or milestone branch. The initial task branches were empty when created and may become behind `main`; before the first task commit, fast-forward the selected branch from updated `main`. Merged task branches can be deleted.
 
 ## CI and release
 

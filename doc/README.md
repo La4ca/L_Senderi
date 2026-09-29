@@ -21,4 +21,4 @@ Senderi is a Facebook-like social platform planned as a TypeScript MERN applicat
 - One Like reaction. Only Public posts can be shared. Chat is one-to-one text between accepted friends.
 - Jan and Laica own complete features across client, server, and tests, and review each other's pull requests.
 
-The feature contracts in these documents guide future implementation. No application endpoints or deployment are present in this documentation-only delivery.
+The feature contracts in these documents guide implementation. The Express foundation for M0-J1 is now in `server/`; the client, remaining features, and deployments follow the milestones.

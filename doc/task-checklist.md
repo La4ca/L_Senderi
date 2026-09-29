@@ -6,10 +6,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M0-J1 — Jan: Express foundation
 
-- [ ] **M0-J1.1** Create the `server/` package, TypeScript configuration, and development/build/start scripts.
-- [ ] **M0-J1.2** Create the Express app and `/api/health` route with JSON output.
-- [ ] **M0-J1.3** Add request validation and a single error-response format from the [API contract](architecture-api.md#shared-http-rules).
-- [ ] **M0-J1.4** Verify health success and malformed-request errors locally.
+- [x] **M0-J1.1** Create the `server/` package, TypeScript configuration, and development/build/start scripts.
+- [x] **M0-J1.2** Create the Express app and `/api/health` route with JSON output.
+- [x] **M0-J1.3** Add request validation and a single error-response format from the [API contract](architecture-api.md#shared-http-rules).
+- [x] **M0-J1.4** Verify health success and malformed-request errors locally.
 
 ### M0-L1 — Laica: React foundation
 
