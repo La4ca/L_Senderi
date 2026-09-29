@@ -20,10 +20,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M0-J2 — Jan: Shared contracts and data connection
 
-- [ ] **M0-J2.1** Create `shared/` with common user, API error, pagination, and visibility types.
-- [ ] **M0-J2.2** Add MongoDB connection startup and shutdown handling; fail startup clearly if connection or required configuration fails.
-- [ ] **M0-J2.3** Set model/index conventions, including unique and TTL indexes called for in [Architecture and API](architecture-api.md#services-and-data-flow).
-- [ ] **M0-J2.4** Add `server/.env.example` with variable names and no credentials; verify type checking.
+- [x] **M0-J2.1** Create `shared/` with common user, API error, pagination, and visibility types.
+- [x] **M0-J2.2** Add MongoDB connection startup and shutdown handling; fail startup clearly if connection or required configuration fails.
+- [x] **M0-J2.3** Set model/index conventions, including unique and TTL indexes called for in [Architecture and API](architecture-api.md#services-and-data-flow).
+- [x] **M0-J2.4** Add `server/.env.example` with variable names and no credentials; verify type checking.
 
 ### M0-L2 — Laica: Client API connection
 
