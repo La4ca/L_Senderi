@@ -4,6 +4,8 @@ Every milestone is required before the first usable release. Each feature owner 
 
 Each numbered task below is a reviewable work item. For implementation or documentation tasks, use one pull request, put its ID in the title (for example, `M1-J2: Sessions and login`), and follow [Branch workflow](branch-workflow.md). A task is complete only after its stated check passes, its contract changes are documented, and the other developer approves it. The final release-tag task follows the reviewed implementation.
 
+Use the [task checklist](task-checklist.md) for smaller steps within each task. Checklist items inherit the owner and dependency of their parent task; they can be completed within the same branch and pull request.
+
 | Milestone | Owner | Tasks | Exit check |
 | --- | --- | --- | --- |
 | M0 — Foundation | Jan and Laica | Jan: Express TypeScript app, MongoDB connection, shared contracts, API validation and error handling. Laica: Vite React TypeScript app, Tailwind, routing, API client, base responsive layout. Together: environment examples, local proxy, CI checks. | Both apps start locally, the client reaches `/api/health`, and CI runs on a pull request. |
