@@ -34,10 +34,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M0-J3 — Jan: Pull-request checks
 
-- [ ] **M0-J3.1** Add scripts for client/server type checks, lint, builds, and available tests.
-- [ ] **M0-J3.2** Add a GitHub Actions pull-request workflow that runs those scripts.
-- [ ] **M0-J3.3** Update [Setup and deployment](setup-deployment.md) with exact local commands and any new variables.
-- [ ] **M0-J3.4** Open a test pull request and confirm CI reports success or a clear failure.
+- [x] **M0-J3.1** Add scripts for client/server type checks, lint, builds, and available tests.
+- [x] **M0-J3.2** Add a GitHub Actions pull-request workflow that runs those scripts.
+- [x] **M0-J3.3** Update [Setup and deployment](setup-deployment.md) with exact local commands and any new variables.
+- [ ] **M0-J3.4** Open a test pull request and confirm CI reports success or a clear failure. *(Pending manual GitHub validation.)*
 
 ## M1 — Accounts
 
