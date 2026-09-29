@@ -29,6 +29,14 @@ button { cursor: pointer; }
 .button-accent:hover { box-shadow: 0 8px 20px rgb(169 201 255 / 25%); transform: translateY(-1px); }
 .button-link { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; padding: 0; color: var(--color-violet); font-size: 14px; font-weight: 700; }
 .button-link:hover { color: var(--color-violet-dark); }
+.state-message { display: flex; align-items: center; gap: 8px; color: var(--color-muted); font-size: 13px; }
+.state-message strong { color: var(--color-ink); font-weight: 700; }
+.state-message-muted { align-items: flex-start; flex-direction: column; gap: 2px; }
+.state-message-error { align-items: flex-start; flex-direction: column; gap: 2px; color: #b34b5d; }
+.state-message-error strong { color: #9c3047; }
+.loading-dot { height: 8px; width: 8px; border-radius: 50%; background: var(--color-violet); box-shadow: 0 0 0 4px rgb(57 115 217 / 12%); }
+.api-status { display: inline-flex; align-items: center; gap: 8px; color: var(--color-violet-dark); font-size: 13px; font-weight: 700; }
+.status-indicator { height: 8px; width: 8px; border-radius: 50%; background: #3973d9; box-shadow: 0 0 0 4px rgb(57 115 217 / 12%); }
 .accent-card { border-radius: 24px; background: #dceaff; }
 .sparkle { display: grid; height: 34px; width: 34px; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 45%); font-size: 20px; }
 .nav-item { display: flex; min-width: max-content; align-items: center; gap: 12px; border-radius: 14px; padding: 12px 14px; color: var(--color-muted); font-size: 14px; font-weight: 600; transition: background .2s, color .2s, transform .2s; }
