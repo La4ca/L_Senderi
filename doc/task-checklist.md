@@ -27,10 +27,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M0-L2 — Laica: Client API connection
 
-- [ ] **M0-L2.1** Configure Vite to proxy `/api` to the local Express server.
-- [ ] **M0-L2.2** Add a typed fetch wrapper that sends cookies and parses the shared API error format.
-- [ ] **M0-L2.3** Add reusable loading, empty, and request-error states for feature pages.
-- [ ] **M0-L2.4** Add `client/.env.example` and verify the client can show a response from `/api/health`.
+- [x] **M0-L2.1** Configure Vite to proxy `/api` to the local Express server.
+- [x] **M0-L2.2** Add a typed fetch wrapper that sends cookies and parses the shared API error format.
+- [x] **M0-L2.3** Add reusable loading, empty, and request-error states for feature pages.
+- [x] **M0-L2.4** Add `client/.env.example` and verify the client can show a response from `/api/health`.
 
 ### M0-J3 — Jan: Pull-request checks
 

@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
+import { ApiError, apiFetch } from "./api/client";
+import { EmptyState, LoadingState, RequestErrorState } from "./components/AsyncState";
 
 type IconName = "home" | "users" | "message" | "user" | "bell" | "plus" | "arrow";
 
@@ -34,6 +37,29 @@ function PlaceholderPage({ title, description, eyebrow = "Senderi space" }: { ti
 }
 
 function HomePage() {
+  const [health, setHealth] = useState<"loading" | "ready" | "empty" | "error">("loading");
+  const [healthMessage, setHealthMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    apiFetch<{ status: string }>("/api/health")
+      .then((response) => {
+        if (active) {
+          setHealth(response.status === "ok" ? "ready" : "empty");
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setHealth("error");
+        setHealthMessage(error instanceof ApiError ? error.message : "The API is unavailable right now.");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-5">
       <section className="hero-card relative overflow-hidden p-7 sm:p-10">
@@ -51,6 +77,12 @@ function HomePage() {
             <p className="text-sm font-semibold text-muted">Your timeline</p>
             <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] text-ink">A fresh start feels good.</h2>
             <p className="mt-2 max-w-md text-sm leading-6 text-muted">When your friends start sharing, their updates will show up here.</p>
+          </div>
+          <div className="mt-5">
+            {health === "loading" && <LoadingState message="Connecting to Senderi..." />}
+            {health === "ready" && <div className="api-status"><span className="status-indicator" /> API connected</div>}
+            {health === "empty" && <EmptyState title="No API status yet" message="The server returned an empty health response." />}
+            {health === "error" && <RequestErrorState title="API unavailable" message={healthMessage} />}
           </div>
           <button className="button-link mt-6" type="button">Find your friends <Icon name="arrow" size={16} /></button>
         </section>
