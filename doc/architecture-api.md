@@ -21,7 +21,7 @@ MongoDB collections: `users`, `sessions`, `friendRequests`, `friendships`, `post
 
 ## Shared HTTP rules
 
-- All routes use `/api`. JSON is the default; image uploads use `multipart/form-data`. Dates are UTC ISO 8601 strings; IDs are opaque strings. Errors use `{ "error": { "code": string, "message": string } }` and appropriate HTTP status (`400`, `401`, `403`, `404`, `409`, `429`).
+- All routes use `/api`. JSON is the default; image uploads use `multipart/form-data`. Dates are UTC ISO 8601 strings; IDs are opaque strings. Errors use `{ "error": { "code": string, "message": string } }` and appropriate HTTP status (`400`, `401`, `403`, `404`, `409`, `413`, `429`, `500`).
 - All routes except registration, login, forgot password, reset password, and the health check require a valid session. Use generic `404` responses where revealing a hidden post or media record would leak its existence.
 - List routes accept `cursor` and `limit` (default 20, maximum 50), ordered newest first, and return `{ items, nextCursor }`. Cursor values are opaque and stable for pagination.
 - Mutations check the `Origin` header against the configured client origin and validate input on the server. No browser-provided user ID is trusted as an actor ID.
