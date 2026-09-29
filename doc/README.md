@@ -7,9 +7,11 @@ Senderi is a Facebook-like social platform planned as a TypeScript MERN applicat
 | [Product requirements](product-requirements.md) | First-release behavior, audience rules, and acceptance criteria |
 | [Architecture and API](architecture-api.md) | Services, data model, REST contracts, and realtime message contract |
 | [Milestones and assignments](milestones.md) | Feature breakdown, dependencies, owners, and exit checks |
+| [Task checklist](task-checklist.md) | Small implementation steps and verification work for every milestone task |
 | [Security](security.md) | Passwords, sessions, authorization, uploads, and abuse controls |
 | [Setup and deployment](setup-deployment.md) | Planned local setup, environment variables, and free-tier deployment |
 | [Branch workflow](branch-workflow.md) | Branch names, pull requests, reviews, and release process |
+| [Task branch map](branch-map.md) | Exact GitHub branch name for each numbered task |
 
 ## Decisions for the first release
 
