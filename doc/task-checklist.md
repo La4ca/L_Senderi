@@ -13,10 +13,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M0-L1 — Laica: React foundation
 
-- [ ] **M0-L1.1** Create the `client/` package with React, Vite, and TypeScript scripts.
-- [ ] **M0-L1.2** Configure Tailwind and establish colors, spacing, and typography used by the page shell.
-- [ ] **M0-L1.3** Add routes and a responsive navigation/page layout with placeholder views.
-- [ ] **M0-L1.4** Verify the client build and layouts at narrow and wide viewport widths.
+- [x] **M0-L1.1** Create the `client/` package with React, Vite, and TypeScript scripts.
+- [x] **M0-L1.2** Configure Tailwind and establish colors, spacing, and typography used by the page shell.
+- [x] **M0-L1.3** Add routes and a responsive navigation/page layout with placeholder views.
+- [x] **M0-L1.4** Verify the client build and layouts at narrow and wide viewport widths.
 
 ### M0-J2 — Jan: Shared contracts and data connection
 
