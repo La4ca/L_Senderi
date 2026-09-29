@@ -1,14 +1,16 @@
 # Local setup and deployment plan
 
-This document describes setup for the application when M0–M7 are implemented. This first delivery contains documentation only, so there are no install or start commands to run yet.
+The Express foundation for M0-J1 is available in `server/`. The React client and provider integrations are added in later milestones.
 
 ## Planned local setup
 
-1. Install the Node.js LTS release and the repository's package manager version once M0 declares it.
-2. Create a MongoDB Atlas Free cluster and database user. Keep the connection string in the server environment; do not commit it. Atlas Free has a 0.5 GB data limit, so keep image bytes in Cloudinary. [Atlas Free limits](https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/)
-3. Create a Cloudinary account. The server signs uploads and handles protected post-photo delivery; the browser does not receive the API secret.
-4. Create a Brevo API key, verified sender, and password-reset email template. Use it only from the server. The free plan currently documents 300 daily sends; Senderi's development cap is lower. [Brevo plans](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans)
-5. Copy the future `client/.env.example` and `server/.env.example` to local ignored files. Start the API and web development servers using the commands M0 adds. Vite proxies `/api` to the local API.
+1. Install Node.js 22 or newer and npm.
+2. From `server/`, run `npm install` and `npm run dev`. The API listens on port 3000 by default; verify it at `http://localhost:3000/api/health`.
+3. From `server/`, run `npm test`, `npm run typecheck`, and `npm run build` to check the current API foundation.
+4. When M0-J2 connects persistence, create a MongoDB Atlas Free cluster and database user. Keep the connection string in the server environment; do not commit it. Atlas Free has a 0.5 GB data limit, so keep image bytes in Cloudinary. [Atlas Free limits](https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/)
+5. Create a Cloudinary account for M2/M4 image work. The server signs uploads and handles protected post-photo delivery; the browser does not receive the API secret.
+6. Create a Brevo API key, verified sender, and password-reset email template for M1. Use it only from the server. The free plan currently documents 300 daily sends; Senderi's development cap is lower. [Brevo plans](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans)
+7. Copy `server/.env.example` and the future `client/.env.example` to local ignored files once M0-J2/M0-L2 add them. Vite will proxy `/api` to the local API.
 
 ## Environment-variable contract
 
