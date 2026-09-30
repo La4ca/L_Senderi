@@ -47,6 +47,11 @@ export const databaseIndexes: readonly DatabaseIndexDefinition[] = [
   },
   {
     collection: collectionNames.passwordResets,
+    keys: { userId: 1 },
+    options: { name: "password_resets_user_unique", unique: true },
+  },
+  {
+    collection: collectionNames.passwordResets,
     keys: { expiresAt: 1 },
     options: { name: "password_resets_expires_at_ttl", expireAfterSeconds: 0 },
   },
