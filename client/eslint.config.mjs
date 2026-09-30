@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   {
-    ignores: ["dist/**"],
+    ignores: ["dist/**", ".vite/**"],
   },
   {
     files: ["**/*.{ts,tsx}"],
