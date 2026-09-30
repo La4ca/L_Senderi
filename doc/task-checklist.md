@@ -50,10 +50,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M1-J2 — Jan: Sessions and login
 
-- [ ] **M1-J2.1** Define the session record, random cookie token, token hash, and seven-day expiry.
-- [ ] **M1-J2.2** Implement password verification and `POST /api/auth/login`; set the HTTP-only session cookie.
-- [ ] **M1-J2.3** Implement session middleware, `GET /api/auth/me`, and `POST /api/auth/logout`.
-- [ ] **M1-J2.4** Check refresh persistence, expired session denial, logout invalidation, and wrong-password behavior.
+- [x] **M1-J2.1** Define the session record, random cookie token, token hash, and seven-day expiry.
+- [x] **M1-J2.2** Implement password verification and `POST /api/auth/login`; set the HTTP-only session cookie.
+- [x] **M1-J2.3** Implement session middleware, `GET /api/auth/me`, and `POST /api/auth/logout`.
+- [x] **M1-J2.4** Check refresh persistence, expired session denial, logout invalidation, and wrong-password behavior.
 
 ### M1-J3 — Jan: Login abuse limits
 
