@@ -32,8 +32,8 @@ MongoDB collections: `users`, `sessions`, `friendRequests`, `friendships`, `post
 | Endpoint | Input and result | Authorization |
 | --- | --- | --- |
 | `POST /api/auth/register` | `{ email, password, displayName }` -> session and `{ user }`; trim and lowercase email, trim display name (1–80 characters), require a 12–128 character password | Public; unique normalized email. |
-| `POST /api/auth/login` | `{ email, password }` -> session and `{ user }` | Public; failed-attempt limits apply. |
-| `POST /api/auth/logout` | Clears current session -> `204` | Current user. |
+| `POST /api/auth/login` | `{ email, password }` -> session and `{ user }`; unknown email and wrong password share a generic `401` | Public; failed-attempt limits apply. |
+| `POST /api/auth/logout` | Deletes the current session and clears its cookie -> `204` | Current user. |
 | `GET /api/auth/me` | `{ user }` | Current user. |
 | `POST /api/auth/forgot-password` | `{ email }` -> generic `202` | Public; reset limits apply before Brevo; same response for known and unknown email. |
 | `POST /api/auth/reset-password` | `{ token, newPassword }` -> `204` | Valid, unused, unexpired token; consumes token and invalidates existing sessions. |

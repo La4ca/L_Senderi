@@ -1,31 +1,46 @@
-import { createHash, randomBytes } from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
-import { Router, type Response } from "express";
+import { Router } from "express";
 import { z } from "zod";
-import { collectionNames, type SessionDocument, type UserDocument } from "../db/documents";
+import { collectionNames, type UserDocument } from "../db/documents";
 import { getDatabase as getConnectedDatabase } from "../db/client";
 import { HttpError } from "../errors/http-error";
 import { requireClientOrigin } from "../middleware/require-client-origin";
 import { validateBody } from "../middleware/validate-body";
-import { hashPassword as hashArgon2idPassword } from "../auth/password";
+import { hashPassword as hashArgon2idPassword, verifyPassword as verifyArgon2idPassword } from "../auth/password";
+import {
+  clearSessionCookie,
+  createSession,
+  createSessionToken,
+  requireSession,
+  setSessionCookie,
+  type AuthenticatedSessionContext,
+} from "../auth/session";
+import { toAuthUserResponse } from "../auth/user-response";
 
-const SESSION_COOKIE_NAME = "senderi_session";
-const SESSION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
-const SESSION_MAX_AGE_SECONDS = SESSION_LIFETIME_MS / 1_000;
+const normalizedEmailSchema = z.string().trim().max(254).toLowerCase().pipe(z.email());
 
 export const registrationSchema = z
   .object({
-    email: z.string().trim().max(254).toLowerCase().pipe(z.email()),
+    email: normalizedEmailSchema,
     password: z.string().min(12).max(128),
     displayName: z.string().trim().min(1).max(80),
   })
   .strict();
 
+export const loginSchema = z
+  .object({
+    email: normalizedEmailSchema,
+    password: z.string().min(1).max(128),
+  })
+  .strict();
+
 type RegistrationInput = z.infer<typeof registrationSchema>;
+type LoginInput = z.infer<typeof loginSchema>;
 
 export interface AuthRouterDependencies {
   getDatabase: () => Db;
   hashPassword: (password: string) => Promise<string>;
+  verifyPassword: (password: string, passwordHash: string) => Promise<boolean>;
   createSessionToken: () => string;
   now: () => Date;
   getAllowedOrigins: () => readonly string[];
@@ -34,7 +49,8 @@ export interface AuthRouterDependencies {
 const defaultDependencies: AuthRouterDependencies = {
   getDatabase: getConnectedDatabase,
   hashPassword: hashArgon2idPassword,
-  createSessionToken: () => randomBytes(32).toString("base64url"),
+  verifyPassword: verifyArgon2idPassword,
+  createSessionToken,
   now: () => new Date(),
   getAllowedOrigins: () =>
     (process.env.CLIENT_ORIGINS ?? "")
@@ -52,27 +68,6 @@ function isDuplicateKeyError(error: unknown): boolean {
   );
 }
 
-function toCurrentUser(user: UserDocument) {
-  return {
-    id: user._id.toHexString(),
-    email: user.email,
-    displayName: user.displayName,
-    bio: user.bio,
-    info: user.info,
-    ...(user.avatarId ? { avatarId: user.avatarId } : {}),
-    ...(user.coverId ? { coverId: user.coverId } : {}),
-    createdAt: user.createdAt.toISOString(),
-  };
-}
-
-function setSessionCookie(response: Response, token: string): void {
-  const secureAttribute = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  response.setHeader(
-    "Set-Cookie",
-    `${SESSION_COOKIE_NAME}=${token}; Path=/api; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${secureAttribute}`,
-  );
-}
-
 export function createAuthRouter(
   overrides: Partial<AuthRouterDependencies> = {},
 ): Router {
@@ -87,7 +82,6 @@ export function createAuthRouter(
       const { email, password, displayName } = request.body as RegistrationInput;
       const database = dependencies.getDatabase();
       const users = database.collection<UserDocument>(collectionNames.users);
-      const sessions = database.collection<SessionDocument>(collectionNames.sessions);
       const createdAt = dependencies.now();
       const existingUser = await users.findOne({ email }, { projection: { _id: 1 } });
       if (existingUser) {
@@ -114,17 +108,15 @@ export function createAuthRouter(
         throw error;
       }
 
-      const sessionToken = dependencies.createSessionToken();
-      const session: SessionDocument = {
-        _id: new ObjectId(),
-        userId: user._id,
-        tokenHash: createHash("sha256").update(sessionToken).digest("hex"),
-        createdAt,
-        expiresAt: new Date(createdAt.getTime() + SESSION_LIFETIME_MS),
-      };
-
+      let sessionToken: string;
       try {
-        await sessions.insertOne(session);
+        const session = await createSession(
+          database,
+          user._id,
+          createdAt,
+          dependencies.createSessionToken,
+        );
+        sessionToken = session.token;
       } catch (error) {
         await users.deleteOne({ _id: user._id }).catch(() => undefined);
         throw error;
@@ -132,7 +124,58 @@ export function createAuthRouter(
 
       response.setHeader("Cache-Control", "private, no-store");
       setSessionCookie(response, sessionToken);
-      response.status(201).json({ user: toCurrentUser(user) });
+      response.status(201).json({ user: toAuthUserResponse(user) });
+    },
+  );
+
+  router.post(
+    "/login",
+    requireClientOrigin(dependencies.getAllowedOrigins),
+    validateBody(loginSchema),
+    async (request, response) => {
+      const { email, password } = request.body as LoginInput;
+      const database = dependencies.getDatabase();
+      const user = await database.collection<UserDocument>(collectionNames.users).findOne({ email });
+
+      if (!user || !(await dependencies.verifyPassword(password, user.passwordHash))) {
+        throw new HttpError(401, "invalid_credentials", "Email or password is incorrect.");
+      }
+
+      const session = await createSession(
+        database,
+        user._id,
+        dependencies.now(),
+        dependencies.createSessionToken,
+      );
+      response.setHeader("Cache-Control", "private, no-store");
+      setSessionCookie(response, session.token);
+      response.status(200).json({ user: toAuthUserResponse(user) });
+    },
+  );
+
+  const requireAuthenticatedSession = requireSession({
+    getDatabase: dependencies.getDatabase,
+    now: dependencies.now,
+  });
+
+  router.get("/me", requireAuthenticatedSession, (_request, response) => {
+    const context = response.locals.authenticatedSession as AuthenticatedSessionContext;
+    response.json({ user: toAuthUserResponse(context.user) });
+  });
+
+  router.post(
+    "/logout",
+    requireClientOrigin(dependencies.getAllowedOrigins),
+    requireAuthenticatedSession,
+    async (_request, response) => {
+      const context = response.locals.authenticatedSession as AuthenticatedSessionContext;
+      await dependencies
+        .getDatabase()
+        .collection("sessions")
+        .deleteOne({ _id: context.sessionId });
+      clearSessionCookie(response);
+      response.setHeader("Cache-Control", "private, no-store");
+      response.status(204).end();
     },
   );
 
