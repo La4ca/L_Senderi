@@ -5,22 +5,33 @@ import argon2 from "argon2";
 import express from "express";
 import { ObjectId, type Db } from "mongodb";
 import request from "supertest";
-import type { SessionDocument, UserDocument } from "../src/db/documents";
+import type {
+  PasswordResetDocument,
+  RateLimitDocument,
+  SessionDocument,
+  UserDocument,
+} from "../src/db/documents";
 import { hashPassword } from "../src/auth/password";
+import { hashPasswordResetToken, storePasswordResetToken } from "../src/auth/password-reset";
 import { SESSION_COOKIE_NAME, hashSessionToken } from "../src/auth/session";
 import { createAuthRouter, type AuthRouterDependencies } from "../src/routes/auth";
 import { errorHandler } from "../src/middleware/error-handler";
 import { notFoundHandler } from "../src/middleware/not-found";
+import { sendPasswordResetEmail } from "../src/auth/brevo";
 
 interface MemoryDatabase {
   db: Db;
   users: UserDocument[];
   sessions: SessionDocument[];
+  passwordResets: PasswordResetDocument[];
+  rateLimits: RateLimitDocument[];
 }
 
 function createMemoryDatabase(): MemoryDatabase {
   const users: UserDocument[] = [];
   const sessions: SessionDocument[] = [];
+  const passwordResets: PasswordResetDocument[] = [];
+  const rateLimits: RateLimitDocument[] = [];
 
   const collections = {
     users: {
@@ -45,6 +56,15 @@ function createMemoryDatabase(): MemoryDatabase {
         if (index >= 0) users.splice(index, 1);
         return { acknowledged: true, deletedCount: index >= 0 ? 1 : 0 };
       },
+      updateOne: async (
+        { _id }: { _id: ObjectId },
+        { $set }: { $set: Partial<UserDocument> },
+      ) => {
+        const user = users.find((storedUser) => storedUser._id.equals(_id));
+        if (!user) return { acknowledged: true, matchedCount: 0, modifiedCount: 0 };
+        Object.assign(user, $set);
+        return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
+      },
     },
     sessions: {
       findOne: async ({ tokenHash }: { tokenHash: string }) =>
@@ -58,14 +78,84 @@ function createMemoryDatabase(): MemoryDatabase {
         if (index >= 0) sessions.splice(index, 1);
         return { acknowledged: true, deletedCount: index >= 0 ? 1 : 0 };
       },
+      deleteMany: async ({ userId }: { userId: ObjectId }) => {
+        const initialLength = sessions.length;
+        for (let index = sessions.length - 1; index >= 0; index -= 1) {
+          if (sessions[index]!.userId.equals(userId)) sessions.splice(index, 1);
+        }
+        return { acknowledged: true, deletedCount: initialLength - sessions.length };
+      },
+    },
+    passwordResets: {
+      findOne: async (filter: {
+        tokenHash?: string;
+        expiresAt?: { $gt?: Date };
+      }) =>
+        passwordResets.find(
+          (reset) =>
+            (filter.tokenHash === undefined || reset.tokenHash === filter.tokenHash) &&
+            (filter.expiresAt?.$gt === undefined || reset.expiresAt > filter.expiresAt.$gt),
+        ) ?? null,
+      findOneAndDelete: async (filter: { tokenHash: string; expiresAt: { $gt: Date } }) => {
+        const index = passwordResets.findIndex(
+          (reset) => reset.tokenHash === filter.tokenHash && reset.expiresAt > filter.expiresAt.$gt,
+        );
+        if (index < 0) return null;
+        return passwordResets.splice(index, 1)[0] ?? null;
+      },
+      insertOne: async (reset: PasswordResetDocument) => {
+        if (passwordResets.some((storedReset) => storedReset.userId.equals(reset.userId))) {
+          throw Object.assign(new Error("Duplicate reset per user index"), { code: 11000 });
+        }
+        passwordResets.push(reset);
+        return { acknowledged: true, insertedId: reset._id };
+      },
+      deleteOne: async ({ _id }: { _id: ObjectId }) => {
+        const index = passwordResets.findIndex((reset) => reset._id.equals(_id));
+        if (index >= 0) passwordResets.splice(index, 1);
+        return { acknowledged: true, deletedCount: index >= 0 ? 1 : 0 };
+      },
+      deleteMany: async ({ userId }: { userId: ObjectId }) => {
+        const initialLength = passwordResets.length;
+        for (let index = passwordResets.length - 1; index >= 0; index -= 1) {
+          if (passwordResets[index]!.userId.equals(userId)) passwordResets.splice(index, 1);
+        }
+        return { acknowledged: true, deletedCount: initialLength - passwordResets.length };
+      },
+    },
+    rateLimits: {
+      updateOne: async (
+        { _id }: { _id: string },
+        update: {
+          $inc: { count: number };
+          $setOnInsert: Pick<RateLimitDocument, "createdAt" | "expiresAt">;
+        },
+        options?: { upsert?: boolean },
+      ) => {
+        const counter = rateLimits.find((storedCounter) => storedCounter._id === _id);
+        if (counter) {
+          counter.count += update.$inc.count;
+          return { acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 };
+        }
+        if (!options?.upsert) {
+          return { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+        }
+        rateLimits.push({
+          _id,
+          count: update.$inc.count,
+          ...update.$setOnInsert,
+        });
+        return { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 1 };
+      },
+      findOne: async ({ _id }: { _id: string }) => rateLimits.find((counter) => counter._id === _id) ?? null,
     },
   };
 
   const db = {
-    collection: (name: "users" | "sessions") => collections[name],
+    collection: (name: keyof typeof collections) => collections[name],
   } as unknown as Db;
 
-  return { db, users, sessions };
+  return { db, users, sessions, passwordResets, rateLimits };
 }
 
 function createTestApp(
@@ -79,6 +169,8 @@ function createTestApp(
     createAuthRouter({
       getDatabase: () => database.db,
       createSessionToken: () => "test-session-token",
+      createPasswordResetToken: () => "test-password-reset-token",
+      getPublicAppUrl: () => "http://localhost:5173",
       now: () => new Date("2026-09-30T00:00:00.000Z"),
       getAllowedOrigins: () => ["http://localhost:5173"],
       ...overrides,
@@ -334,4 +426,302 @@ test("logout deletes the session and clears its cookie", async () => {
 
   const afterLogout = await agent.get("/api/auth/me");
   assert.equal(afterLogout.status, 401);
+});
+
+test("forgot password gives known and unknown emails the same response and stores only a 15-minute token hash", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database);
+  const sentEmails: Array<{ email: string; resetUrl: string }> = [];
+  const app = createTestApp(database, {
+    sendPasswordResetEmail: async (email) => {
+      sentEmails.push(email);
+    },
+  });
+
+  const known = await request(app)
+    .post("/api/auth/forgot-password")
+    .set("Origin", "http://localhost:5173")
+    .send({ email: " MEMBER@Example.com " });
+  const unknown = await request(app)
+    .post("/api/auth/forgot-password")
+    .set("Origin", "http://localhost:5173")
+    .send({ email: "nobody@example.com" });
+
+  assert.equal(known.status, 202);
+  assert.equal(unknown.status, 202);
+  assert.deepEqual(known.body, unknown.body);
+  assert.equal(known.headers["cache-control"], "private, no-store");
+  assert.equal(sentEmails.length, 1);
+  assert.equal(sentEmails[0]!.email, "member@example.com");
+  const resetUrl = new URL(sentEmails[0]!.resetUrl);
+  assert.equal(resetUrl.origin, "http://localhost:5173");
+  assert.equal(resetUrl.pathname, "/reset-password");
+  assert.equal(resetUrl.searchParams.get("token"), "test-password-reset-token");
+
+  assert.equal(database.passwordResets.length, 1);
+  assert.equal(
+    database.passwordResets[0]!.tokenHash,
+    hashPasswordResetToken("test-password-reset-token"),
+  );
+  assert.equal(database.passwordResets[0]!.tokenHash.includes("test-password-reset-token"), false);
+  assert.equal(database.passwordResets[0]!.expiresAt.toISOString(), "2026-09-30T00:15:00.000Z");
+  assert.ok(database.rateLimits.every((counter) => !counter._id.includes("member@example.com")));
+});
+
+test("Brevo adapter sends the configured sender, template ID, and resetUrl parameter", async () => {
+  let sentUrl: string | undefined;
+  let sentHeaders: Headers | undefined;
+  let sentPayload: unknown;
+
+  await sendPasswordResetEmail(
+    { email: "member@example.com", resetUrl: "https://senderi.example/reset-password?token=one-time" },
+    {
+      apiKey: "test-api-key",
+      senderEmail: "verified@senderi.example",
+      templateId: 42,
+      fetch: async (input, init) => {
+        sentUrl = String(input);
+        sentHeaders = new Headers(init?.headers);
+        sentPayload = JSON.parse(String(init?.body)) as unknown;
+        return new Response(null, { status: 201 });
+      },
+    },
+  );
+
+  assert.equal(sentUrl, "https://api.brevo.com/v3/smtp/email");
+  assert.equal(sentHeaders?.get("api-key"), "test-api-key");
+  assert.deepEqual(sentPayload, {
+    sender: { email: "verified@senderi.example", name: "Senderi" },
+    to: [{ email: "member@example.com" }],
+    templateId: 42,
+    params: { resetUrl: "https://senderi.example/reset-password?token=one-time" },
+  });
+});
+
+test("Brevo failure stays generic and removes the unsent reset token", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database);
+  const app = createTestApp(database, {
+    sendPasswordResetEmail: async () => {
+      throw new Error("provider rejected request");
+    },
+  });
+  const originalError = console.error;
+  console.error = () => undefined;
+
+  try {
+    const known = await request(app)
+      .post("/api/auth/forgot-password")
+      .set("Origin", "http://localhost:5173")
+      .send({ email: "member@example.com" });
+    const unknown = await request(app)
+      .post("/api/auth/forgot-password")
+      .set("Origin", "http://localhost:5173")
+      .send({ email: "nobody@example.com" });
+
+    assert.equal(known.status, 202);
+    assert.equal(unknown.status, 202);
+    assert.deepEqual(known.body, unknown.body);
+    assert.equal(database.passwordResets.length, 0);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test("reset consumes a token once, changes the Argon2id hash, and invalidates every session", async () => {
+  const database = createMemoryDatabase();
+  const user = await addUser(database);
+  const token = "single-use-password-reset-token";
+  const sessionToken = "pre-reset-session-token";
+  database.sessions.push({
+    _id: new ObjectId(),
+    userId: user._id,
+    tokenHash: hashSessionToken(sessionToken),
+    createdAt: new Date("2026-09-29T00:00:00.000Z"),
+    expiresAt: new Date("2026-10-06T00:00:00.000Z"),
+  });
+  await storePasswordResetToken(database.db, user._id, token, new Date("2026-09-30T00:00:00.000Z"));
+  const app = createTestApp(database);
+
+  const reset = await request(app)
+    .post("/api/auth/reset-password")
+    .set("Origin", "http://localhost:5173")
+    .send({ token, newPassword: "brand new secure passphrase" });
+
+  assert.equal(reset.status, 204);
+  assert.match(user.passwordHash, /^\$argon2id\$/);
+  assert.equal(await argon2.verify(user.passwordHash, "brand new secure passphrase"), true);
+  assert.equal(await argon2.verify(user.passwordHash, "correct horse battery staple"), false);
+  assert.equal(database.sessions.length, 0);
+  assert.equal(database.passwordResets.length, 0);
+  assert.equal(reset.headers["cache-control"], "private, no-store");
+  const clearedCookie = reset.headers["set-cookie"];
+  const cookie = Array.isArray(clearedCookie) ? clearedCookie[0] : clearedCookie;
+  assert.ok(cookie?.includes(`${SESSION_COOKIE_NAME}=`));
+  assert.ok(cookie?.includes("Max-Age=0"));
+
+  const oldSession = await request(app)
+    .get("/api/auth/me")
+    .set("Cookie", `${SESSION_COOKIE_NAME}=${sessionToken}`);
+  assert.equal(oldSession.status, 401);
+
+  const reused = await request(app)
+    .post("/api/auth/reset-password")
+    .set("Origin", "http://localhost:5173")
+    .send({ token, newPassword: "another secure password" });
+  assert.equal(reused.status, 400);
+  assert.equal(reused.body.error.code, "invalid_reset_token");
+});
+
+test("concurrent reset submissions atomically allow only one token consumer", async () => {
+  const database = createMemoryDatabase();
+  const user = await addUser(database);
+  const token = "concurrent-single-use-reset-token";
+  await storePasswordResetToken(database.db, user._id, token, new Date("2026-09-30T00:00:00.000Z"));
+  const app = createTestApp(database);
+  const submit = (newPassword: string) =>
+    request(app)
+      .post("/api/auth/reset-password")
+      .set("Origin", "http://localhost:5173")
+      .send({ token, newPassword });
+
+  const results = await Promise.all([
+    submit("first replacement passphrase"),
+    submit("second replacement passphrase"),
+  ]);
+
+  assert.deepEqual(results.map((result) => result.status).sort(), [204, 400]);
+  assert.equal(database.passwordResets.length, 0);
+  const firstPasswordWasSet = await argon2.verify(user.passwordHash, "first replacement passphrase");
+  const secondPasswordWasSet = await argon2.verify(user.passwordHash, "second replacement passphrase");
+  assert.equal(firstPasswordWasSet || secondPasswordWasSet, true);
+});
+
+test("expired and invalid reset tokens are denied and failed checks are rate limited", async () => {
+  const database = createMemoryDatabase();
+  const user = await addUser(database);
+  const expiredToken = "expired-password-reset-token";
+  database.passwordResets.push({
+    _id: new ObjectId(),
+    userId: user._id,
+    tokenHash: hashPasswordResetToken(expiredToken),
+    createdAt: new Date("2026-09-29T23:00:00.000Z"),
+    expiresAt: new Date("2026-09-29T23:15:00.000Z"),
+  });
+  const app = createTestApp(database, {
+    getClientIp: (request) => request.get("x-test-client-ip") ?? "test-ip",
+    rateLimits: { resetFailuresPerIpPer15Minutes: 2 },
+  });
+
+  const firstFailure = await request(app)
+    .post("/api/auth/reset-password")
+    .set("Origin", "http://localhost:5173")
+    .set("x-test-client-ip", "198.51.100.1")
+    .send({ token: "invalid-but-well-formed-reset-token", newPassword: "new secure passphrase" });
+  const blockedFailure = await request(app)
+    .post("/api/auth/reset-password")
+    .set("Origin", "http://localhost:5173")
+    .set("x-test-client-ip", "198.51.100.1")
+    .send({ token: expiredToken, newPassword: "new secure passphrase" });
+  const rateLimitedFailure = await request(app)
+    .post("/api/auth/reset-password")
+    .set("Origin", "http://localhost:5173")
+    .set("x-test-client-ip", "198.51.100.1")
+    .send({ token: "another-invalid-reset-token-value", newPassword: "new secure passphrase" });
+
+  assert.equal(firstFailure.status, 400);
+  assert.equal(firstFailure.body.error.code, "invalid_reset_token");
+  assert.equal(blockedFailure.status, 400);
+  assert.deepEqual(blockedFailure.body, firstFailure.body);
+  assert.equal(rateLimitedFailure.status, 429);
+  assert.equal(rateLimitedFailure.body.error.code, "rate_limited");
+  assert.equal(rateLimitedFailure.headers["retry-after"], "900");
+  assert.equal(user.passwordHash.includes("new secure passphrase"), false);
+  assert.equal(database.passwordResets.length, 1);
+});
+
+test("forgot-password email and IP limits apply before account lookup with consistent responses", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database);
+  const app = createTestApp(database, {
+    getClientIp: (request) => request.get("x-test-client-ip") ?? "test-ip",
+    sendPasswordResetEmail: async () => undefined,
+  });
+  const forgot = (email: string, ip: string) =>
+    request(app)
+      .post("/api/auth/forgot-password")
+      .set("Origin", "http://localhost:5173")
+      .set("x-test-client-ip", ip)
+      .send({ email });
+
+  const knownAttempts = [];
+  const unknownAttempts = [];
+  for (let index = 0; index < 4; index += 1) {
+    knownAttempts.push(await forgot("member@example.com", `known-ip-${index}`));
+    unknownAttempts.push(await forgot("nobody@example.com", `unknown-ip-${index}`));
+  }
+  assert.deepEqual(knownAttempts.map((response) => response.status), [202, 202, 202, 429]);
+  assert.deepEqual(unknownAttempts.map((response) => response.status), [202, 202, 202, 429]);
+  assert.deepEqual(knownAttempts[3]!.body, unknownAttempts[3]!.body);
+  assert.equal(knownAttempts[3]!.headers["retry-after"], unknownAttempts[3]!.headers["retry-after"]);
+
+  const sharedIpResponses = [];
+  for (let index = 0; index < 4; index += 1) {
+    sharedIpResponses.push(await forgot(`other-${index}@example.com`, "shared-ip"));
+  }
+  assert.deepEqual(sharedIpResponses.map((response) => response.status), [202, 202, 202, 429]);
+  assert.equal(sharedIpResponses[3]!.headers["retry-after"], "3600");
+});
+
+test("forgot-password email and IP counters expire at the next UTC-hour window", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database);
+  let currentTime = new Date("2026-09-30T00:00:00.000Z");
+  const app = createTestApp(database, {
+    now: () => currentTime,
+    getClientIp: (request) => request.get("x-test-client-ip") ?? "test-ip",
+    sendPasswordResetEmail: async () => undefined,
+  });
+  const forgot = () =>
+    request(app)
+      .post("/api/auth/forgot-password")
+      .set("Origin", "http://localhost:5173")
+      .set("x-test-client-ip", "same-ip")
+      .send({ email: "member@example.com" });
+
+  for (let index = 0; index < 3; index += 1) assert.equal((await forgot()).status, 202);
+  assert.equal((await forgot()).status, 429);
+  currentTime = new Date("2026-09-30T01:00:00.000Z");
+  assert.equal((await forgot()).status, 202);
+});
+
+test("development Brevo send cap applies across accounts without changing the generic response", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database, "first@example.com");
+  await addUser(database, "second@example.com");
+  const sentEmails: string[] = [];
+  const app = createTestApp(database, {
+    getEnvironment: () => "development",
+    getClientIp: (request) => request.get("x-test-client-ip") ?? "test-ip",
+    rateLimits: { developmentBrevoSendsPerDay: 1 },
+    sendPasswordResetEmail: async ({ email }) => {
+      sentEmails.push(email);
+    },
+  });
+  const forgot = (email: string, ip: string) =>
+    request(app)
+      .post("/api/auth/forgot-password")
+      .set("Origin", "http://localhost:5173")
+      .set("x-test-client-ip", ip)
+      .send({ email });
+
+  const first = await forgot("first@example.com", "first-ip");
+  const cappedKnown = await forgot("second@example.com", "second-ip");
+  const unknown = await forgot("unknown@example.com", "unknown-ip");
+
+  assert.deepEqual([first.status, cappedKnown.status, unknown.status], [202, 202, 202]);
+  assert.deepEqual(first.body, cappedKnown.body);
+  assert.deepEqual(cappedKnown.body, unknown.body);
+  assert.deepEqual(sentEmails, ["first@example.com"]);
+  assert.equal(database.passwordResets.length, 1);
 });

@@ -56,7 +56,7 @@ For Atlas, create a MongoDB Atlas Free cluster and database user. Keep the conne
 
 Create a Cloudinary account for M2/M4 image work. The server signs uploads and handles protected post-photo delivery; the browser does not receive the API secret.
 
-Create a Brevo API key, verified sender, and password-reset email template for M1. Use it only from the server. Senderi's development send cap is enforced by the application.
+Create a Brevo API key, verify the sender address, and create and activate a transactional reset-email template. Use a template link that reads the dynamic `resetUrl` parameter (for example, `{{params.resetUrl}}`). Configure `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and the numeric `BREVO_RESET_TEMPLATE_ID` in `server/.env` locally and in Render's server environment. The server sends the template through [Brevo's transactional email endpoint](https://developers.brevo.com/docs/send-a-transactional-email) and passes `resetUrl` in the template parameters. Keep the API key only on the server. Senderi enforces a development-wide cap of 100 attempted reset-email sends per UTC day.
 
 ## Environment-variable contract
 
@@ -68,13 +68,14 @@ The committed `server/.env.example` and `client/.env.example` contain placeholde
 | `PORT` | Server | Render-provided listening port; local default documented by M0. |
 | `MONGODB_URI` | Server | Atlas connection string. |
 | `CLIENT_ORIGINS` | Server | Comma-separated exact Vercel or local client origins allowed for mutation and socket checks. Add a preview URL only while testing that preview. |
+| `TRUST_PROXY_HOPS` | Server | Number of trusted reverse-proxy hops before Express; `0` locally. Set the Render value to the verified request path's hop count so per-IP limits use the client address. |
 | `SESSION_SECRET` | Server | Random secret for session-token hashing or signing support. |
 | `CLOUDINARY_CLOUD_NAME` | Server | Cloudinary environment name. |
 | `CLOUDINARY_API_KEY` | Server | Signed upload credential. |
 | `CLOUDINARY_API_SECRET` | Server | Signed upload and media credential. |
 | `BREVO_API_KEY` | Server | Transactional email credential. |
 | `BREVO_SENDER_EMAIL` | Server | Verified sender address. |
-| `BREVO_RESET_TEMPLATE_ID` | Server | Reset-email template. |
+| `BREVO_RESET_TEMPLATE_ID` | Server | Numeric ID of the active reset-email template. Its link must use the `resetUrl` template parameter. |
 | `PUBLIC_APP_URL` | Server | Base URL for reset links. |
 | `VITE_SOCKET_URL` | Client | Public Render Socket.IO endpoint; not a secret. |
 

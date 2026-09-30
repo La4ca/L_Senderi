@@ -12,8 +12,20 @@ function readPort(): number {
   return port;
 }
 
+function readTrustedProxyHops(): number {
+  const configured = process.env.TRUST_PROXY_HOPS;
+  const hops = configured === undefined
+    ? process.env.NODE_ENV === "production" ? 1 : 0
+    : Number(configured);
+  if (!Number.isInteger(hops) || hops < 0 || hops > 10) {
+    throw new Error("TRUST_PROXY_HOPS must be an integer between 0 and 10.");
+  }
+  return hops;
+}
+
 async function startServer(): Promise<void> {
   const port = readPort();
+  app.set("trust proxy", readTrustedProxyHops());
   await connectToDatabase();
 
   const server = app.listen(port, "0.0.0.0");

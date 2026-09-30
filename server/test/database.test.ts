@@ -21,6 +21,7 @@ test("database indexes cover documented uniqueness and expiry rules", () => {
       ["friendships", { userIdLow: 1, userIdHigh: 1 }],
       ["likes", { userId: 1, postId: 1 }],
       ["messages", { senderId: 1, clientId: 1 }],
+      ["passwordResets", { userId: 1 }],
     ],
   );
 

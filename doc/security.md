@@ -7,11 +7,11 @@ These rules are part of the first-release acceptance criteria and apply to the A
 - Hash passwords with Argon2id and a per-password salt; never store reversible passwords or log submitted passwords. Enforce 12–128 characters to prevent resource abuse while allowing long passphrases.
 - Issue a cryptographically random, opaque session token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie for the Vercel same-origin `/api` path. Store only its hash in MongoDB; expire sessions after seven days. For local HTTP development, omit `Secure` while keeping `HttpOnly` and `SameSite=Lax`.
 - Require a session for profile, social, media, and chat-history routes. Reject state-changing requests whose `Origin` is not in the exact `CLIENT_ORIGINS` allowlist. Socket.IO connections use one-use, 60-second tickets issued to an authenticated session; check the client origin as well.
-- Forgot-password always returns the same `202` response. For a known account, generate a cryptographically random token, store only its hash, expire it in 15 minutes, send one Brevo email, and consume it atomically on successful reset. Invalidate that user's existing sessions. Do not place raw tokens in logs.
+- Forgot-password returns the same generic `202` response for a known or unknown email. Apply the email and IP counters before account lookup; their `429` response is also independent of account existence. For a known account, generate a cryptographically random token, store only its hash, expire it in 15 minutes, send one Brevo email, and atomically consume it on reset. Keep at most one outstanding token per account and invalidate that user's existing sessions. Do not place raw tokens in logs.
 
 ## Rate limits
 
-Use MongoDB-backed, expiring counters so limits survive a Render restart. Apply limits before expensive password verification or Brevo calls. Return `429` with `Retry-After` for limited requests; keep forgot-password account existence hidden by using the same outward response where necessary.
+Use MongoDB-backed, expiring counters so limits survive a Render restart. Counter IDs contain a SHA-256 digest of the email or IP rather than the raw value. Forgot-password limits use fixed UTC-hour windows, the development send cap uses a UTC-day window, and reset-token failures use fixed UTC 15-minute windows. Configure Express's trusted proxy hop count for the actual deployment path before relying on source-IP limits; never trust forwarded headers from unverified hops. Apply limits before expensive password verification or Brevo calls. Return `429` with `Retry-After` for limited requests; run forgot-password counters before account lookup so its status never reveals whether an account exists.
 
 | Action | Application limit |
 | --- | --- |

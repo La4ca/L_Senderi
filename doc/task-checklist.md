@@ -64,11 +64,11 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M1-J4 — Jan: Forgot and reset password
 
-- [ ] **M1-J4.1** Create a 15-minute reset-token record storing only a hash; make consumption atomic.
-- [ ] **M1-J4.2** Add forgot-password counters per email/IP and the development-wide Brevo send cap.
-- [ ] **M1-J4.3** Configure the Brevo sender/template and send a reset link only for a known account, while returning the same outward response for known and unknown emails.
-- [ ] **M1-J4.4** Implement reset-token verification, new password hashing, token consumption, and session invalidation.
-- [ ] **M1-J4.5** Check expired, reused, and invalid tokens; provider failure; and rate limits without account-existence leakage.
+- [x] **M1-J4.1** Create a 15-minute reset-token record storing only a hash; make consumption atomic.
+- [x] **M1-J4.2** Add forgot-password counters per email/IP and the development-wide Brevo send cap.
+- [x] **M1-J4.3** Configure the Brevo sender/template and send a reset link only for a known account, while returning the same outward response for known and unknown emails.
+- [x] **M1-J4.4** Implement reset-token verification, new password hashing, token consumption, and session invalidation.
+- [x] **M1-J4.5** Check expired, reused, and invalid tokens; provider failure; and rate limits without account-existence leakage.
 
 ### M1-J5 — Jan: Account screens
 
