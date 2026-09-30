@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { ApiError, apiFetch } from "./api/client";
 import { EmptyState, LoadingState, RequestErrorState } from "./components/AsyncState";
+import { useAuth } from "./auth/AuthContext";
+import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from "./pages/AccountPages";
 
 type IconName = "home" | "users" | "message" | "user" | "bell" | "plus" | "arrow";
 
@@ -96,37 +98,132 @@ function HomePage() {
 }
 
 export default function App() {
+  const { user, isLoading, initializationError, refreshUser } = useAuth();
+
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-line/80 bg-canvas/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-8">
           <NavLink to="/" className="flex items-center gap-2 text-xl font-extrabold tracking-[-0.06em] text-ink sm:text-2xl">senderi<span className="text-violet">.</span></NavLink>
-          <div className="flex items-center gap-3">
-            <button className="icon-button hidden sm:flex" type="button" aria-label="Notifications"><Icon name="bell" size={19} /><span className="notification-dot" /></button>
-            <span className="hidden text-sm font-medium text-muted sm:inline">Welcome back, Laica</span>
-            <div className="avatar">L</div>
-          </div>
+          <HeaderActions />
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 sm:px-8 sm:py-10 lg:flex-row">
-        <aside className="lg:w-56 lg:shrink-0">
-          <nav aria-label="Main navigation" className="flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-8 lg:flex-col lg:overflow-visible">
-            <p className="mb-2 hidden px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted lg:block">Explore</p>
-            {navigation.map((item) => <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}><Icon name={item.icon} size={19} />{item.label}</NavLink>)}
-          </nav>
-        </aside>
+      {initializationError && !isLoading && (
+        <div className="mx-auto mt-4 flex max-w-7xl items-center justify-between gap-4 px-5 sm:px-8" role="status">
+          <p className="text-sm text-muted">{initializationError}</p>
+          <button className="text-sm font-semibold text-violet hover:text-violet-dark" type="button" onClick={() => void refreshUser()}>Retry</button>
+        </div>
+      )}
 
-        <main className="min-w-0 flex-1">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/friends" element={<PlaceholderPage title="Your people, all in one place." description="Friend requests and your connections will appear here." eyebrow="Friends" />} />
-            <Route path="/messages" element={<PlaceholderPage title="Conversations that feel easy." description="Your private conversations will appear here." eyebrow="Messages" />} />
-            <Route path="/profile" element={<PlaceholderPage title="A little more about you." description="Tell your friends a little more about who you are." eyebrow="Profile" />} />
-            <Route path="*" element={<PlaceholderPage title="That page is still finding its way." description="The page you are looking for does not exist yet." />} />
-          </Routes>
-        </main>
-      </div>
+      <Routes>
+        <Route path="/" element={isLoading ? <PageLoading /> : user ? <MemberLayout><HomePage /></MemberLayout> : <PublicHomePage />} />
+        <Route path="/login" element={<PublicAccountRoute><LoginPage /></PublicAccountRoute>} />
+        <Route path="/signup" element={<PublicAccountRoute><SignupPage /></PublicAccountRoute>} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/friends" element={<RequireUser><PlaceholderPage title="Your people, all in one place." description="Friend requests and your connections will appear here." eyebrow="Friends" /></RequireUser>} />
+        <Route path="/messages" element={<RequireUser><PlaceholderPage title="Conversations that feel easy." description="Your private conversations will appear here." eyebrow="Messages" /></RequireUser>} />
+        <Route path="/profile" element={<RequireUser><PlaceholderPage title="A little more about you." description="Tell your friends a little more about who you are." eyebrow="Profile" /></RequireUser>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
+  );
+}
+
+function HeaderActions() {
+  const { user, isLoading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSignOut() {
+    setPending(true);
+    setError(null);
+    try {
+      await signOut();
+      navigate("/login", { replace: true });
+    } catch {
+      setError("We couldn’t sign you out. Check your connection and try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="relative flex items-center gap-3">
+      {error && <span className="header-alert" role="alert">{error}</span>}
+      {isLoading ? (
+        <span className="text-sm font-medium text-muted" role="status">Restoring session…</span>
+      ) : user ? (
+        <>
+          <span className="hidden max-w-40 truncate text-sm font-semibold text-muted sm:inline">{user.displayName}</span>
+          <div className="avatar" aria-label={`${user.displayName} profile`}>{user.displayName.trim().charAt(0).toUpperCase()}</div>
+          <button className="header-action" type="button" onClick={() => void handleSignOut()} disabled={pending}>{pending ? "Signing out…" : "Sign out"}</button>
+        </>
+      ) : (
+        <>
+          <Link className="header-link" to="/login">Sign in</Link>
+          <Link className="header-action" to="/signup">Create account</Link>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PageLoading() {
+  return <main className="mx-auto flex min-h-[55vh] max-w-7xl items-center px-5 sm:px-8"><LoadingState message="Restoring your Senderi session…" /></main>;
+}
+
+function PublicAccountRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageLoading />;
+  if (user) return <Navigate to="/" replace />;
+  return children;
+}
+
+function RequireUser({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageLoading />;
+  if (!user) return <Navigate to="/login" replace />;
+  return <MemberLayout>{children}</MemberLayout>;
+}
+
+function MemberLayout({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 sm:px-8 sm:py-10 lg:flex-row">
+      <aside className="lg:w-56 lg:shrink-0">
+        <nav aria-label="Main navigation" className="flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-8 lg:flex-col lg:overflow-visible">
+          <p className="mb-2 hidden px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted lg:block">Explore</p>
+          {navigation.map((item) => <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}><Icon name={item.icon} size={19} />{item.label}</NavLink>)}
+        </nav>
+      </aside>
+      <main className="min-w-0 flex-1">{children}</main>
+    </div>
+  );
+}
+
+function PublicHomePage() {
+  return (
+    <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-12">
+      <section className="hero-card relative overflow-hidden p-7 sm:p-12 lg:min-h-[420px]">
+        <div className="relative z-10 max-w-2xl">
+          <span className="eyebrow eyebrow-light">Your space to connect</span>
+          <h1 className="mt-4 max-w-xl font-display text-4xl font-bold leading-[1.08] tracking-[-0.055em] text-white sm:text-6xl">Make space for the good stuff.</h1>
+          <p className="mt-5 max-w-lg text-base leading-7 text-white/70 sm:text-lg">Share a moment, catch up with your people, and keep the little things that matter close.</p>
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <Link className="button-accent" to="/signup">Create your account <Icon name="arrow" size={16} /></Link>
+            <Link className="font-semibold text-white/85 transition hover:text-white" to="/login">I already have an account</Link>
+          </div>
+        </div>
+        <div className="hero-orbit hero-orbit-one" aria-hidden="true" />
+        <div className="hero-orbit hero-orbit-two" aria-hidden="true" />
+      </section>
+      <div className="mt-5 grid gap-5 md:grid-cols-3">
+        <section className="surface-card p-6"><span className="eyebrow">Share</span><h2 className="mt-3 font-display text-xl font-bold text-ink">Keep the moments</h2><p className="mt-2 text-sm leading-6 text-muted">Post a thought or a photo for the people you choose.</p></section>
+        <section className="surface-card p-6"><span className="eyebrow">Connect</span><h2 className="mt-3 font-display text-xl font-bold text-ink">Find your circle</h2><p className="mt-2 text-sm leading-6 text-muted">Build a space with friends and people you care about.</p></section>
+        <section className="surface-card p-6"><span className="eyebrow">Belong</span><h2 className="mt-3 font-display text-xl font-bold text-ink">Make it yours</h2><p className="mt-2 text-sm leading-6 text-muted">Create an account and shape your own Senderi profile.</p></section>
+      </div>
+    </main>
   );
 }

@@ -10,6 +10,7 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly code: string,
+    public readonly retryAfterSeconds: number | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -58,11 +59,15 @@ export async function apiFetch<T>(path: string, options: ApiRequestInit = {}): P
     : undefined;
 
   if (!response.ok) {
+    const retryAfterHeader = response.headers.get("Retry-After");
+    const retryAfterSeconds = retryAfterHeader && /^\d+$/.test(retryAfterHeader)
+      ? Number(retryAfterHeader)
+      : null;
     if (isApiErrorBody(responseBody)) {
-      throw new ApiError(responseBody.error.message, response.status, responseBody.error.code);
+      throw new ApiError(responseBody.error.message, response.status, responseBody.error.code, retryAfterSeconds);
     }
 
-    throw new ApiError("The request could not be completed.", response.status, "request_failed");
+    throw new ApiError("The request could not be completed.", response.status, "request_failed", retryAfterSeconds);
   }
 
   return responseBody as T;

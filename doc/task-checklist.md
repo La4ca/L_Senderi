@@ -72,10 +72,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M1-J5 — Jan: Account screens
 
-- [ ] **M1-J5.1** Add signup and login forms with field validation and server-error display.
-- [ ] **M1-J5.2** Restore user state through `/api/auth/me` on page load and add logout.
-- [ ] **M1-J5.3** Add forgot-password and reset-password forms with sent, expired, invalid, and throttled states.
-- [ ] **M1-J5.4** Complete the browser journey from signup through logout, login, reset, and login with the new password.
+- [x] **M1-J5.1** Add signup and login forms with field validation and server-error display.
+- [x] **M1-J5.2** Restore user state through `/api/auth/me` on page load and add logout.
+- [x] **M1-J5.3** Add forgot-password and reset-password forms with sent, expired, invalid, and throttled states.
+- [x] **M1-J5.4** Complete the browser journey from signup through logout, login, reset, and login with the new password. *(Manually verified: registered an account, logged in, received the reset email, reset the password, and logged in with the new password.)*
 
 ## M2 — Profiles
 
