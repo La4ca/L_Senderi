@@ -12,15 +12,19 @@ export interface RateLimitDecision {
   retryAfterSeconds: number;
 }
 
+export function createRateLimitId(scope: string, identifier: string): string {
+  const identifierHash = createHash("sha256").update(identifier).digest("hex");
+  return `${scope}:${identifierHash}`;
+}
+
 export function createRateLimitKey(scope: string, identifier: string, now: Date, windowMs: number): {
   id: string;
   expiresAt: Date;
 } {
   const windowStart = Math.floor(now.getTime() / windowMs) * windowMs;
-  const identifierHash = createHash("sha256").update(identifier).digest("hex");
 
   return {
-    id: `${scope}:${identifierHash}:${windowStart}`,
+    id: `${createRateLimitId(scope, identifier)}:${windowStart}`,
     expiresAt: new Date(windowStart + windowMs),
   };
 }
@@ -64,6 +68,48 @@ export async function incrementRateLimit(
     count: counter.count,
     retryAfterSeconds: Math.max(1, Math.ceil((counter.expiresAt.getTime() - now.getTime()) / 1_000)),
   };
+}
+
+/** Remove the reservation for a successful login so only failures consume quota. */
+export async function releaseRateLimitAttempt(database: Db, id: string): Promise<void> {
+  await database.collection<RateLimitDocument>(collectionNames.rateLimits).updateOne(
+    { _id: id, count: { $gt: 0 } },
+    { $inc: { count: -1 } },
+  );
+}
+
+export async function getRateLimitCooldownSeconds(
+  database: Db,
+  id: string,
+  now: Date,
+): Promise<number | null> {
+  const cooldown = await database.collection<RateLimitDocument>(collectionNames.rateLimits).findOne({ _id: id });
+  if (!cooldown || cooldown.expiresAt.getTime() <= now.getTime()) return null;
+  return Math.max(1, Math.ceil((cooldown.expiresAt.getTime() - now.getTime()) / 1_000));
+}
+
+export async function startRateLimitCooldown(
+  database: Db,
+  id: string,
+  now: Date,
+  durationMs: number,
+): Promise<void> {
+  const cooldowns = database.collection<RateLimitDocument>(collectionNames.rateLimits);
+  const update = {
+    $set: {
+      count: 1,
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + durationMs),
+    },
+  };
+
+  try {
+    await cooldowns.updateOne({ _id: id }, update, { upsert: true });
+  } catch (error) {
+    // A concurrent cooldown insert can win the unique _id race.
+    if (!isDuplicateKeyError(error)) throw error;
+    await cooldowns.updateOne({ _id: id }, update);
+  }
 }
 
 function isDuplicateKeyError(error: unknown): boolean {

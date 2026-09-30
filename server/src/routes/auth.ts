@@ -24,11 +24,15 @@ import {
   storePasswordResetToken,
 } from "../auth/password-reset";
 import {
+  createRateLimitId,
   createRateLimitKey,
   DAY_MS,
   FIFTEEN_MINUTES_MS,
   HOUR_MS,
+  getRateLimitCooldownSeconds,
   incrementRateLimit,
+  releaseRateLimitAttempt,
+  startRateLimitCooldown,
 } from "../auth/rate-limit";
 
 const normalizedEmailSchema = z.string().trim().max(254).toLowerCase().pipe(z.email());
@@ -63,6 +67,8 @@ type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export interface AuthRateLimits {
+  loginFailuresPerEmailPer15Minutes: number;
+  loginFailuresPerIpPer15Minutes: number;
   forgotPerEmailPerHour: number;
   forgotPerIpPerHour: number;
   developmentBrevoSendsPerDay: number;
@@ -70,6 +76,8 @@ export interface AuthRateLimits {
 }
 
 const DEFAULT_RATE_LIMITS: AuthRateLimits = {
+  loginFailuresPerEmailPer15Minutes: 5,
+  loginFailuresPerIpPer15Minutes: 5,
   forgotPerEmailPerHour: 3,
   forgotPerIpPerHour: 3,
   developmentBrevoSendsPerDay: 100,
@@ -190,19 +198,96 @@ export function createAuthRouter(
     async (request, response) => {
       const { email, password } = request.body as LoginInput;
       const database = dependencies.getDatabase();
-      const user = await database.collection<UserDocument>(collectionNames.users).findOne({ email });
+      const now = dependencies.now();
+      const clientIp = dependencies.getClientIp(request);
+      const emailCooldownId = createRateLimitId("login:cooldown:email", email);
+      const ipCooldownId = createRateLimitId("login:cooldown:ip", clientIp);
+      const emailKey = createRateLimitKey("login:email", email, now, FIFTEEN_MINUTES_MS);
+      const ipKey = createRateLimitKey("login:ip", clientIp, now, FIFTEEN_MINUTES_MS);
+      response.setHeader("Cache-Control", "private, no-store");
 
-      if (!user || !(await dependencies.verifyPassword(password, user.passwordHash))) {
+      const [emailCooldown, ipCooldown] = await Promise.all([
+        getRateLimitCooldownSeconds(database, emailCooldownId, now),
+        getRateLimitCooldownSeconds(database, ipCooldownId, now),
+      ]);
+      if (emailCooldown !== null || ipCooldown !== null) {
+        response.setHeader(
+          "Retry-After",
+          String(Math.max(emailCooldown ?? 0, ipCooldown ?? 0)),
+        );
+        throw new HttpError(429, "rate_limited", "Too many login attempts. Please try again later.");
+      }
+
+      // Reserve both attempt slots before account lookup or Argon2 verification.
+      const [emailAttempt, ipAttempt] = await Promise.all([
+        incrementRateLimit(
+          database,
+          emailKey.id,
+          emailKey.expiresAt,
+          dependencies.rateLimits.loginFailuresPerEmailPer15Minutes,
+          now,
+        ),
+        incrementRateLimit(
+          database,
+          ipKey.id,
+          ipKey.expiresAt,
+          dependencies.rateLimits.loginFailuresPerIpPer15Minutes,
+          now,
+        ),
+      ]);
+
+      if (!emailAttempt.allowed || !ipAttempt.allowed) {
+        const releases = [];
+        if (emailAttempt.allowed) releases.push(releaseRateLimitAttempt(database, emailKey.id));
+        if (ipAttempt.allowed) releases.push(releaseRateLimitAttempt(database, ipKey.id));
+        await Promise.all(releases);
+        response.setHeader(
+          "Retry-After",
+          String(Math.max(emailAttempt.retryAfterSeconds, ipAttempt.retryAfterSeconds)),
+        );
+        throw new HttpError(429, "rate_limited", "Too many login attempts. Please try again later.");
+      }
+
+      let user: UserDocument | null;
+      let passwordMatches: boolean;
+      try {
+        user = await database.collection<UserDocument>(collectionNames.users).findOne({ email });
+        passwordMatches = user
+          ? await dependencies.verifyPassword(password, user.passwordHash)
+          : false;
+      } catch (error) {
+        await Promise.all([
+          releaseRateLimitAttempt(database, emailKey.id),
+          releaseRateLimitAttempt(database, ipKey.id),
+        ]).catch(() => undefined);
+        throw error;
+      }
+
+      if (!user || !passwordMatches) {
+        const cooldowns = [];
+        if (emailAttempt.count >= dependencies.rateLimits.loginFailuresPerEmailPer15Minutes) {
+          cooldowns.push(
+            startRateLimitCooldown(database, emailCooldownId, now, FIFTEEN_MINUTES_MS),
+          );
+        }
+        if (ipAttempt.count >= dependencies.rateLimits.loginFailuresPerIpPer15Minutes) {
+          cooldowns.push(startRateLimitCooldown(database, ipCooldownId, now, FIFTEEN_MINUTES_MS));
+        }
+        await Promise.all(cooldowns);
         throw new HttpError(401, "invalid_credentials", "Email or password is incorrect.");
       }
+
+      await Promise.all([
+        releaseRateLimitAttempt(database, emailKey.id),
+        releaseRateLimitAttempt(database, ipKey.id),
+      ]);
 
       const session = await createSession(
         database,
         user._id,
-        dependencies.now(),
+        now,
         dependencies.createSessionToken,
       );
-      response.setHeader("Cache-Control", "private, no-store");
       setSessionCookie(response, session.token);
       response.status(200).json({ user: toAuthUserResponse(user) });
     },
