@@ -125,26 +125,33 @@ function createMemoryDatabase(): MemoryDatabase {
     },
     rateLimits: {
       updateOne: async (
-        { _id }: { _id: string },
+        { _id, count: countFilter }: { _id: string; count?: { $gt: number } },
         update: {
-          $inc: { count: number };
-          $setOnInsert: Pick<RateLimitDocument, "createdAt" | "expiresAt">;
+          $inc?: { count: number };
+          $setOnInsert?: Pick<RateLimitDocument, "createdAt" | "expiresAt">;
+          $set?: Pick<RateLimitDocument, "count" | "createdAt" | "expiresAt">;
         },
         options?: { upsert?: boolean },
       ) => {
         const counter = rateLimits.find((storedCounter) => storedCounter._id === _id);
         if (counter) {
-          counter.count += update.$inc.count;
+          if (countFilter && counter.count <= countFilter.$gt) {
+            return { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+          }
+          if (update.$set) Object.assign(counter, update.$set);
+          if (update.$inc) counter.count += update.$inc.count;
           return { acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 };
         }
         if (!options?.upsert) {
           return { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
         }
-        rateLimits.push({
+        const insertedCounter: RateLimitDocument = {
           _id,
-          count: update.$inc.count,
-          ...update.$setOnInsert,
-        });
+          count: update.$set?.count ?? update.$inc?.count ?? 0,
+          createdAt: update.$set?.createdAt ?? update.$setOnInsert?.createdAt ?? new Date(0),
+          expiresAt: update.$set?.expiresAt ?? update.$setOnInsert?.expiresAt ?? new Date(0),
+        };
+        rateLimits.push(insertedCounter);
         return { acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 1 };
       },
       findOne: async ({ _id }: { _id: string }) => rateLimits.find((counter) => counter._id === _id) ?? null,
@@ -382,6 +389,87 @@ test("wrong and unknown login credentials return the same response without issui
   });
   assert.equal(database.sessions.length, 0);
   assert.equal(wrongPassword.headers["set-cookie"], undefined);
+});
+
+test("login email failures are throttled before password verification and recover after cooldown", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database);
+  let currentTime = new Date("2026-09-30T00:00:00.000Z");
+  let verificationCalls = 0;
+  const app = createTestApp(database, {
+    now: () => currentTime,
+    getClientIp: (request) => request.get("x-test-client-ip") ?? "test-ip",
+    verifyPassword: async (password) => {
+      verificationCalls += 1;
+      return password === "correct horse battery staple";
+    },
+  });
+  const login = (password: string, ip: string) =>
+    request(app)
+      .post("/api/auth/login")
+      .set("Origin", "http://localhost:5173")
+      .set("x-test-client-ip", ip)
+      .send({ email: " MEMBER@Example.com ", password });
+
+  for (let index = 0; index < 5; index += 1) {
+    assert.equal((await login("incorrect password", `email-test-ip-${index}`)).status, 401);
+  }
+  assert.equal(verificationCalls, 5);
+  assert.ok(database.rateLimits.some((counter) => counter._id.startsWith("login:email:")));
+  assert.ok(database.rateLimits.every((counter) => !counter._id.includes("member@example.com")));
+
+  const blocked = await login("correct horse battery staple", "email-test-ip-after-limit");
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.body.error.code, "rate_limited");
+  assert.equal(blocked.headers["retry-after"], "900");
+  assert.equal(verificationCalls, 5);
+  assert.equal(database.sessions.length, 0);
+
+  currentTime = new Date("2026-09-30T00:15:00.000Z");
+  const recovered = await login("correct horse battery staple", "email-test-ip-after-cooldown");
+  assert.equal(recovered.status, 200);
+  assert.equal(verificationCalls, 6);
+  assert.equal(database.sessions.length, 1);
+});
+
+test("login source-IP failures are throttled across accounts and recover after cooldown", async () => {
+  const database = createMemoryDatabase();
+  await addUser(database);
+  let currentTime = new Date("2026-09-30T00:00:00.000Z");
+  let verificationCalls = 0;
+  const app = createTestApp(database, {
+    now: () => currentTime,
+    getClientIp: (request) => request.get("x-test-client-ip") ?? "test-ip",
+    verifyPassword: async (password) => {
+      verificationCalls += 1;
+      return password === "correct horse battery staple";
+    },
+  });
+  const login = (email: string, ip: string, password = "incorrect password") =>
+    request(app)
+      .post("/api/auth/login")
+      .set("Origin", "http://localhost:5173")
+      .set("x-test-client-ip", ip)
+      .send({ email, password });
+
+  for (let index = 0; index < 5; index += 1) {
+    assert.equal((await login(`unknown-${index}@example.com`, "shared-login-ip")).status, 401);
+  }
+  assert.ok(database.rateLimits.some((counter) => counter._id.startsWith("login:ip:")));
+  assert.ok(database.rateLimits.every((counter) => !counter._id.includes("shared-login-ip")));
+
+  const blocked = await login("member@example.com", "shared-login-ip", "correct horse battery staple");
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.body.error.code, "rate_limited");
+  assert.equal(blocked.headers["retry-after"], "900");
+  assert.equal(verificationCalls, 0);
+  assert.equal(database.sessions.length, 0);
+
+  currentTime = new Date("2026-09-30T00:15:00.000Z");
+  const recovered = await login("member@example.com", "shared-login-ip", "correct horse battery staple");
+  assert.equal(recovered.status, 200);
+  assert.equal(verificationCalls, 1);
+  assert.equal(database.sessions.length, 1);
 });
 
 test("expired sessions are denied even before MongoDB TTL cleanup", async () => {

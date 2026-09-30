@@ -57,10 +57,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M1-J3 — Jan: Login abuse limits
 
-- [ ] **M1-J3.1** Define MongoDB-backed counters for normalized email and source IP, with expiry.
-- [ ] **M1-J3.2** Apply the five-failure/15-minute policy before expensive password verification.
-- [ ] **M1-J3.3** Return the documented limit response and `Retry-After`; clear or expire counters after cooldown.
-- [ ] **M1-J3.4** Check both email and IP limits and successful login after cooldown.
+- [x] **M1-J3.1** Define MongoDB-backed counters for normalized email and source IP, with expiry.
+- [x] **M1-J3.2** Apply the five-failure/15-minute policy before expensive password verification.
+- [x] **M1-J3.3** Return the documented limit response and `Retry-After`; clear or expire counters after cooldown.
+- [x] **M1-J3.4** Check both email and IP limits and successful login after cooldown.
 
 ### M1-J4 — Jan: Forgot and reset password
 

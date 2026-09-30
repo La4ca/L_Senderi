@@ -32,7 +32,7 @@ MongoDB collections: `users`, `sessions`, `friendRequests`, `friendships`, `post
 | Endpoint | Input and result | Authorization |
 | --- | --- | --- |
 | `POST /api/auth/register` | `{ email, password, displayName }` -> session and `{ user }`; trim and lowercase email, trim display name (1–80 characters), require a 12–128 character password | Public; unique normalized email. |
-| `POST /api/auth/login` | `{ email, password }` -> session and `{ user }`; unknown email and wrong password share a generic `401` | Public; failed-attempt limits apply. |
+| `POST /api/auth/login` | `{ email, password }` -> session and `{ user }`; unknown email and wrong password share a generic `401`; throttled requests return `429 rate_limited` and `Retry-After` | Public; five failed attempts per normalized email and source IP in a fixed 15-minute window, followed by a 15-minute cooldown. Check limits before account lookup and password verification. |
 | `POST /api/auth/logout` | Deletes the current session and clears its cookie -> `204` | Current user. |
 | `GET /api/auth/me` | `{ user }` | Current user. |
 | `POST /api/auth/forgot-password` | `{ email }` -> generic `202` | Public; normalized-email and source-IP limits run before account lookup. Known and unknown emails get the same `202` body; email/IP throttles return the same `429` for either. |
