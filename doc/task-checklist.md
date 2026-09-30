@@ -43,10 +43,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M1-J1 — Jan: Registration
 
-- [ ] **M1-J1.1** Define user fields and the unique normalized-email index.
-- [ ] **M1-J1.2** Validate signup input, including display name and the password rules in [Security](security.md#passwords-sessions-and-reset).
-- [ ] **M1-J1.3** Hash the password with Argon2id and implement `POST /api/auth/register` without returning the hash.
-- [ ] **M1-J1.4** Check successful signup, duplicate email, invalid input, and stored-record contents.
+- [x] **M1-J1.1** Define user fields and the unique normalized-email index.
+- [x] **M1-J1.2** Validate signup input, including display name and the password rules in [Security](security.md#passwords-sessions-and-reset).
+- [x] **M1-J1.3** Hash the password with Argon2id and implement `POST /api/auth/register` without returning the hash.
+- [x] **M1-J1.4** Check successful signup, duplicate email, invalid input, and stored-record contents.
 
 ### M1-J2 — Jan: Sessions and login
 

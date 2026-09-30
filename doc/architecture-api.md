@@ -31,7 +31,7 @@ MongoDB collections: `users`, `sessions`, `friendRequests`, `friendships`, `post
 
 | Endpoint | Input and result | Authorization |
 | --- | --- | --- |
-| `POST /api/auth/register` | `{ email, password, displayName }` -> session and `{ user }` | Public; unique normalized email. |
+| `POST /api/auth/register` | `{ email, password, displayName }` -> session and `{ user }`; trim and lowercase email, trim display name (1–80 characters), require a 12–128 character password | Public; unique normalized email. |
 | `POST /api/auth/login` | `{ email, password }` -> session and `{ user }` | Public; failed-attempt limits apply. |
 | `POST /api/auth/logout` | Clears current session -> `204` | Current user. |
 | `GET /api/auth/me` | `{ user }` | Current user. |
