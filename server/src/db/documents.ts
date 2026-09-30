@@ -16,10 +16,11 @@ export const collectionNames = {
   rateLimits: "rateLimits",
 } as const;
 
-/** Store email in normalized lowercase form before writing the user record. */
+/** Store a trimmed, lowercase email and an Argon2id password hash. */
 export interface UserDocument {
   _id: ObjectId;
   email: string;
+  passwordHash: string;
   displayName: string;
   bio: string;
   info: {

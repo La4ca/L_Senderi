@@ -19,6 +19,7 @@ interface DatabaseIndexDefinition {
  * are BSON dates named expiresAt.
  */
 export const databaseIndexes: readonly DatabaseIndexDefinition[] = [
+  // Signup stores a trimmed, lowercase email before this unique index is applied.
   {
     collection: collectionNames.users,
     keys: { email: 1 },

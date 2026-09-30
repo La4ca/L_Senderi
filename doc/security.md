@@ -4,7 +4,7 @@ These rules are part of the first-release acceptance criteria and apply to the A
 
 ## Passwords, sessions, and reset
 
-- Hash passwords with Argon2id and a per-password salt; never store reversible passwords or log submitted passwords. Enforce a minimum of 12 characters and a reasonable maximum input size to prevent resource abuse.
+- Hash passwords with Argon2id and a per-password salt; never store reversible passwords or log submitted passwords. Enforce 12–128 characters to prevent resource abuse while allowing long passphrases.
 - Issue a cryptographically random, opaque session token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie for the Vercel same-origin `/api` path. Store only its hash in MongoDB; expire sessions after seven days. For local HTTP development, omit `Secure` while keeping `HttpOnly` and `SameSite=Lax`.
 - Require a session for profile, social, media, and chat-history routes. Reject state-changing requests whose `Origin` is not in the exact `CLIENT_ORIGINS` allowlist. Socket.IO connections use one-use, 60-second tickets issued to an authenticated session; check the client origin as well.
 - Forgot-password always returns the same `202` response. For a known account, generate a cryptographically random token, store only its hash, expire it in 15 minutes, send one Brevo email, and consume it atomically on successful reset. Invalidate that user's existing sessions. Do not place raw tokens in logs.
