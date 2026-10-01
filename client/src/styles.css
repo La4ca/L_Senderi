@@ -37,8 +37,10 @@ button { cursor: pointer; }
 .loading-dot { height: 8px; width: 8px; border-radius: 50%; background: var(--color-violet); box-shadow: 0 0 0 4px rgb(57 115 217 / 12%); }
 .api-status { display: inline-flex; align-items: center; gap: 8px; color: var(--color-violet-dark); font-size: 13px; font-weight: 700; }
 .status-indicator { height: 8px; width: 8px; border-radius: 50%; background: #3973d9; box-shadow: 0 0 0 4px rgb(57 115 217 / 12%); }
-.profile-cover { position: relative; min-height: 190px; border-radius: 24px; background: #dceaff; }
-.profile-avatar { position: absolute; bottom: -42px; left: 24px; display: grid; height: 84px; width: 84px; place-items: center; border: 6px solid var(--color-surface); border-radius: 50%; background: var(--color-violet); color: white; font-size: 30px; font-weight: 700; box-shadow: 0 8px 20px rgb(20 33 61 / 14%); }
+.profile-cover { position: relative; height: 230px; border-radius: 24px; background: #dceaff; }
+.profile-cover-image { position: absolute; inset: 0; height: 100%; width: 100%; border-radius: 24px; object-fit: cover; object-position: center; }
+.profile-avatar { position: absolute; z-index: 1; bottom: -42px; left: 24px; display: grid; height: 84px; width: 84px; place-items: center; overflow: hidden; border: 6px solid var(--color-surface); border-radius: 50%; background: var(--color-violet); color: white; font-size: 30px; font-weight: 700; box-shadow: 0 8px 20px rgb(20 33 61 / 14%); }
+.profile-avatar img { height: 100%; width: 100%; object-fit: cover; }
 .profile-status { display: inline-flex; width: fit-content; border-radius: 999px; background: #edf3ff; padding: 8px 12px; color: var(--color-violet-dark); font-size: 12px; font-weight: 700; }
 .profile-info { display: grid; gap: 16px; border-radius: 16px; background: var(--color-canvas); padding: 18px; }
 .profile-info dt { color: var(--color-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
@@ -51,6 +53,12 @@ button { cursor: pointer; }
 .profile-field > span { color: var(--color-muted); font-size: 12px; font-weight: 500; text-align: right; }
 .form-success { color: #28643e; font-size: 14px; font-weight: 700; }
 .form-error { color: #9c3047; font-size: 14px; font-weight: 700; }
+.profile-image-controls { display: grid; gap: 16px; margin-top: 28px; border-top: 1px solid var(--color-line); padding-top: 24px; }
+.button-outline { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); padding: 0 14px; color: var(--color-violet-dark); font-size: 13px; font-weight: 700; transition: border-color .2s, background .2s; }
+.button-outline:hover { border-color: var(--color-violet); background: #f4f7ff; }
+.button-outline:disabled { cursor: wait; opacity: .6; }
+.upload-progress { height: 7px; overflow: hidden; border-radius: 999px; background: var(--color-blue-soft); }
+.upload-progress span { display: block; height: 100%; border-radius: inherit; background: var(--color-violet); transition: width .2s ease; }
 .accent-card { border-radius: 24px; background: #dceaff; }
 .sparkle { display: grid; height: 34px; width: 34px; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 45%); font-size: 20px; }
 .nav-item { display: flex; min-width: max-content; align-items: center; gap: 12px; border-radius: 14px; padding: 12px 14px; color: var(--color-muted); font-size: 14px; font-weight: 600; transition: background .2s, color .2s, transform .2s; }
@@ -94,6 +102,7 @@ button { cursor: pointer; }
 
 @media (max-width: 640px) {
   .hero-card { min-height: 390px; }
+  .profile-cover { height: 180px; }
 }
 
 @media (max-width: 820px) {
