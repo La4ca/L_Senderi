@@ -42,13 +42,13 @@ export async function apiFetch<T>(path: string, options: ApiRequestInit = {}): P
   const requestHeaders = new Headers(headers);
   requestHeaders.set("Accept", "application/json");
 
-  if (body !== undefined) {
+  if (body !== undefined && !(body instanceof FormData)) {
     requestHeaders.set("Content-Type", "application/json");
   }
 
   const response = await fetch(path, {
     ...requestInit,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     credentials: "include",
     headers: requestHeaders,
   });
@@ -71,4 +71,39 @@ export async function apiFetch<T>(path: string, options: ApiRequestInit = {}): P
   }
 
   return responseBody as T;
+}
+
+export async function apiUpload<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", path);
+    request.withCredentials = true;
+    request.setRequestHeader("Accept", "application/json");
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    });
+    request.addEventListener("error", () => reject(new ApiError("The request could not be completed.", 0, "request_failed")));
+    request.addEventListener("load", () => {
+      let responseBody: unknown;
+      try {
+        responseBody = request.responseText ? JSON.parse(request.responseText) : undefined;
+      } catch {
+        responseBody = undefined;
+      }
+      if (request.status >= 200 && request.status < 300) {
+        resolve(responseBody as T);
+        return;
+      }
+      if (isApiErrorBody(responseBody)) {
+        reject(new ApiError(responseBody.error.message, request.status, responseBody.error.code));
+        return;
+      }
+      reject(new ApiError("The request could not be completed.", request.status, "request_failed"));
+    });
+    request.send(body);
+  });
 }
