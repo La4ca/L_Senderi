@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError, apiFetch } from "../api/client";
+import { ApiError, apiFetch, apiUpload } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { LoadingState, RequestErrorState } from "../components/AsyncState";
 
@@ -45,6 +45,11 @@ function validateForm(values: FormValues): string | null {
   return null;
 }
 
+function profileImageUrl(assetId: string | undefined): string | undefined {
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim();
+  return assetId && cloudName ? `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${assetId}` : undefined;
+}
+
 export function ProfilePage() {
   const { user: currentUser, refreshUser } = useAuth();
   const { userId } = useParams();
@@ -55,6 +60,12 @@ export function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [previews, setPreviews] = useState<{ avatar?: string; cover?: string }>({});
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!profileId) return;
@@ -124,6 +135,47 @@ export function ProfilePage() {
     }
   }
 
+  async function uploadImage(kind: "avatar" | "cover", file: File) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setUploadMessage("Choose a JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadMessage("Profile images must be 5 MB or smaller.");
+      return;
+    }
+    setUploading(kind);
+    setUploadProgress(0);
+    setUploadMessage(null);
+    const body = new FormData();
+    body.append("file", file);
+    try {
+      const response = await apiUpload<{ user: Profile }>(`/api/users/me/${kind}`, body, setUploadProgress);
+      setProfile((current) => current ? { ...current, user: response.user } : current);
+      setPreviews((current) => ({ ...current, [kind]: undefined }));
+      setUploadMessage(`${kind === "avatar" ? "Profile photo" : "Cover photo"} updated.`);
+      await refreshUser();
+    } catch (requestError: unknown) {
+      setUploadMessage(requestError instanceof ApiError ? requestError.message : "We couldn’t upload that image.");
+    } finally {
+      setUploading(null);
+      setUploadProgress(0);
+      if (kind === "avatar" && avatarInput.current) avatarInput.current.value = "";
+      if (kind === "cover" && coverInput.current) coverInput.current.value = "";
+    }
+  }
+
+  function chooseImage(kind: "avatar" | "cover", file: File | undefined) {
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    setPreviews((current) => {
+      const previous = current[kind];
+      if (previous) URL.revokeObjectURL(previous);
+      return { ...current, [kind]: preview };
+    });
+    void uploadImage(kind, file);
+  }
+
   if (!profileId) return <RequestErrorState title="Profile unavailable" message="Sign in to view your profile." />;
   if (isLoading) return <LoadingState message="Loading profile..." />;
   if (error || !profile || !form) return <RequestErrorState title="Unable to load profile" message={error ?? "Please try again."} />;
@@ -131,7 +183,10 @@ export function ProfilePage() {
   return (
     <div className="space-y-5">
       <section className="profile-cover">
-        <div className="profile-avatar">{profile.user.displayName.trim().charAt(0).toUpperCase()}</div>
+        {(previews.cover ?? profileImageUrl(profile.user.coverId)) && <img className="profile-cover-image" src={previews.cover ?? profileImageUrl(profile.user.coverId)} alt="" />}
+        <div className="profile-avatar">
+          {previews.avatar ?? profileImageUrl(profile.user.avatarId) ? <img src={previews.avatar ?? profileImageUrl(profile.user.avatarId)} alt={`${profile.user.displayName} profile`} /> : profile.user.displayName.trim().charAt(0).toUpperCase()}
+        </div>
       </section>
 
       <section className="surface-card -mt-12 p-6 pt-16 sm:p-8 sm:pt-16">
@@ -169,6 +224,17 @@ export function ProfilePage() {
             {saveMessage && <p className={saveMessage === "Profile saved." ? "form-success" : "form-error"} role={saveMessage === "Profile saved." ? "status" : "alert"}>{saveMessage}</p>}
             <div><button className="button-accent" type="submit" disabled={isSaving}>{isSaving ? "Saving..." : "Save changes"}</button></div>
           </form>
+          <div className="profile-image-controls">
+            <div><span className="eyebrow">Profile images</span><p className="mt-2 text-sm leading-6 text-muted">JPEG, PNG, or WebP up to 5 MB.</p></div>
+            <div className="flex flex-wrap gap-3">
+              <input ref={avatarInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => chooseImage("avatar", event.target.files?.[0])} />
+              <input ref={coverInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => chooseImage("cover", event.target.files?.[0])} />
+              <button className="button-outline" type="button" onClick={() => avatarInput.current?.click()} disabled={uploading !== null}>{uploading === "avatar" ? "Uploading..." : "Change profile photo"}</button>
+              <button className="button-outline" type="button" onClick={() => coverInput.current?.click()} disabled={uploading !== null}>{uploading === "cover" ? "Uploading..." : "Change cover photo"}</button>
+            </div>
+            {uploading && <div aria-label={`Upload progress ${uploadProgress}%`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadProgress} className="upload-progress"><span style={{ width: `${uploadProgress}%` }} /></div>}
+            {uploadMessage && <p className={uploadMessage.endsWith("updated.") ? "form-success" : "form-error"} role="status">{uploadMessage}</p>}
+          </div>
         </section>
       )}
     </div>
