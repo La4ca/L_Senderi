@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from "./api/client";
 import { EmptyState, LoadingState, RequestErrorState } from "./components/AsyncState";
 import { useAuth } from "./auth/AuthContext";
 import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from "./pages/AccountPages";
+import { ProfilePage } from "./pages/ProfilePage";
 
 type IconName = "home" | "users" | "message" | "user" | "bell" | "plus" | "arrow";
 
@@ -124,7 +125,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/friends" element={<RequireUser><PlaceholderPage title="Your people, all in one place." description="Friend requests and your connections will appear here." eyebrow="Friends" /></RequireUser>} />
         <Route path="/messages" element={<RequireUser><PlaceholderPage title="Conversations that feel easy." description="Your private conversations will appear here." eyebrow="Messages" /></RequireUser>} />
-        <Route path="/profile" element={<RequireUser><PlaceholderPage title="A little more about you." description="Tell your friends a little more about who you are." eyebrow="Profile" /></RequireUser>} />
+        <Route path="/profile" element={<RequireUser><ProfilePage /></RequireUser>} />
+        <Route path="/profile/:userId" element={<RequireUser><ProfilePage /></RequireUser>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
