@@ -94,14 +94,18 @@ test("signed-in users can read a profile without private email data", async () =
   assert.equal(response.headers["cache-control"], "private, no-store");
 });
 
-test("profile text edits update only the authenticated owner", async () => {
+test("profile edits only change the account identified by the authenticated session", async () => {
   const owner = makeUser("owner@example.com", "Owner Example");
-  const app = createTestApp([owner], [sessionFor(owner)]);
+  const other = makeUser("other@example.com", "Other Example");
+  const app = createTestApp(
+    [owner, other],
+    [sessionFor(owner, "owner-profile-token"), sessionFor(other, "other-profile-token")],
+  );
 
   const response = await request(app)
     .patch("/api/users/me")
     .set("Origin", "http://localhost:5173")
-    .set("Cookie", `${SESSION_COOKIE_NAME}=profile-session-token`)
+    .set("Cookie", `${SESSION_COOKIE_NAME}=owner-profile-token`)
     .send({
       displayName: "Updated Owner",
       bio: "A short profile bio.",
@@ -117,11 +121,16 @@ test("profile text edits update only the authenticated owner", async () => {
   });
   assert.equal(response.body.user.email, "owner@example.com");
   assert.equal(owner.displayName, "Updated Owner");
+  assert.equal(owner.bio, "A short profile bio.");
+  assert.equal(other.displayName, "Other Example");
+  assert.equal(other.bio, "");
+  assert.deepEqual(other.info, {});
 });
 
-test("profile edits reject invalid fields and non-owner route targets", async () => {
+test("profile edits reject invalid fields and unsupported user-targeted edits", async () => {
   const owner = makeUser("owner@example.com", "Owner Example");
-  const app = createTestApp([owner], [sessionFor(owner)]);
+  const other = makeUser("other@example.com", "Other Example");
+  const app = createTestApp([owner, other], [sessionFor(owner)]);
   const cookie = `${SESSION_COOKIE_NAME}=profile-session-token`;
 
   const invalidWebsite = await request(app)
@@ -141,9 +150,10 @@ test("profile edits reject invalid fields and non-owner route targets", async ()
   assert.equal(unknownField.body.error.code, "validation_error");
 
   const otherTarget = await request(app)
-    .patch(`/api/users/${new ObjectId().toHexString()}`)
+    .patch(`/api/users/${other._id.toHexString()}`)
     .set("Origin", "http://localhost:5173")
     .set("Cookie", cookie)
     .send({ displayName: "Not allowed" });
   assert.equal(otherTarget.status, 404);
+  assert.equal(other.displayName, "Other Example");
 });
