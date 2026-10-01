@@ -81,31 +81,31 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M2-L1 — Laica: Profile data and API
 
-- [ ] **M2-L1.1** Add display name, bio, location, website, avatar ID, and cover ID to the profile model and shared response type.
-- [ ] **M2-L1.2** Implement signed-in profile read and owner-only text edit routes.
-- [ ] **M2-L1.3** Validate field lengths and require an HTTPS URL for website.
-- [ ] **M2-L1.4** Check owner success, non-owner denial, and invalid-field responses.
+- [x] **M2-L1.1** Add display name, bio, location, website, avatar ID, and cover ID to the profile model and shared response type.
+- [x] **M2-L1.2** Implement signed-in profile read and owner-only text edit routes.
+- [x] **M2-L1.3** Validate field lengths and require an HTTPS URL for website.
+- [x] **M2-L1.4** Check owner success, non-owner denial, and invalid-field responses.
 
 ### M2-L2 — Laica: Profile screens
 
-- [ ] **M2-L2.1** Show profile name, bio, information, avatar, cover, and friendship status.
-- [ ] **M2-L2.2** Show edit controls only for the current user's profile.
-- [ ] **M2-L2.3** Save text changes with loading, validation, and failure feedback.
+- [x] **M2-L2.1** Show profile name, bio, information, avatar, cover, and friendship status.
+- [x] **M2-L2.2** Show edit controls only for the current user's profile.
+- [x] **M2-L2.3** Save text changes with loading, validation, and failure feedback.
 - [ ] **M2-L2.4** Check edits after refresh and from another signed-in account.
 
 ### M2-L3 — Laica: Profile image storage
 
-- [ ] **M2-L3.1** Validate avatar and cover file type/content and the 5 MB size limit on the server.
-- [ ] **M2-L3.2** Upload the accepted image to Cloudinary and save its asset ID to the correct profile field.
-- [ ] **M2-L3.3** Delete the old asset after successful replacement and the new asset if the database update fails.
-- [ ] **M2-L3.4** Check upload, replacement, invalid file, and persistence after server restart.
+- [x] **M2-L3.1** Validate avatar and cover file type/content and the 5 MB size limit on the server.
+- [x] **M2-L3.2** Upload the accepted image to Cloudinary and save its asset ID to the correct profile field.
+- [x] **M2-L3.3** Delete the old asset after successful replacement and the new asset if the database update fails.
+- [x] **M2-L3.4** Check upload, replacement, invalid file, and persistence after server restart.
 
 ### M2-L4 — Laica: Profile image controls
 
-- [ ] **M2-L4.1** Add avatar and cover pickers, previews, progress, and error messages.
-- [ ] **M2-L4.2** Render both images in the profile layout at mobile and desktop widths.
-- [ ] **M2-L4.3** Hide controls from non-owners and verify the API also rejects their upload attempts.
-- [ ] **M2-L4.4** Check replacement in the browser without stale images after refresh.
+- [x] **M2-L4.1** Add avatar and cover pickers, previews, progress, and error messages.
+- [x] **M2-L4.2** Render both images in the profile layout at mobile and desktop widths.
+- [x] **M2-L4.3** Hide controls from non-owners and verify the API also rejects their upload attempts.
+- [x] **M2-L4.4** Check replacement in the browser without stale images after refresh.
 
 ## M3 — Friends
 
