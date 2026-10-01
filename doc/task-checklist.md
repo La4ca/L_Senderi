@@ -81,10 +81,10 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M2-L1 — Laica: Profile data and API
 
-- [ ] **M2-L1.1** Add display name, bio, location, website, avatar ID, and cover ID to the profile model and shared response type.
-- [ ] **M2-L1.2** Implement signed-in profile read and owner-only text edit routes.
-- [ ] **M2-L1.3** Validate field lengths and require an HTTPS URL for website.
-- [ ] **M2-L1.4** Check owner success, non-owner denial, and invalid-field responses.
+- [x] **M2-L1.1** Add display name, bio, location, website, avatar ID, and cover ID to the profile model and shared response type. *(These fields were already present in the model and shared `User` type; the profile API now returns them.)*
+- [x] **M2-L1.2** Implement signed-in profile read and owner-only text edit routes.
+- [x] **M2-L1.3** Validate field lengths and require an HTTPS URL for website.
+- [x] **M2-L1.4** Check owner success, non-owner denial, and invalid-field responses. *(Two-account test confirms `/api/users/me` changes only the account identified by the authenticated session; PATCHing the other account’s ID is rejected with 404, and invalid fields return 400.)*
 
 ### M2-L2 — Laica: Profile screens
 
