@@ -88,15 +88,15 @@ This checklist breaks down the 34 reviewable tasks in [Milestones and assignment
 
 ### M2-L2 — Laica: Profile screens
 
-- [ ] **M2-L2.1** Show profile name, bio, information, avatar, cover, and friendship status.
-- [ ] **M2-L2.2** Show edit controls only for the current user's profile.
-- [ ] **M2-L2.3** Save text changes with loading, validation, and failure feedback.
-- [ ] **M2-L2.4** Check edits after refresh and from another signed-in account.
+- [x] **M2-L2.1** Show profile name, bio, information, avatar, cover, and friendship status. *(Renders Cloudinary avatar/cover URLs when configured and available, with graceful placeholders; the profile API reports self, accepted friends, or not friends.)*
+- [x] **M2-L2.2** Show edit controls only for the current user's profile. *(The edit form is rendered only when the loaded profile ID matches the signed-in user's ID.)*
+- [x] **M2-L2.3** Save text changes with loading, validation, and failure feedback. *(The form validates input, shows a saving state, and reports save success or errors.)*
+- [x] **M2-L2.4** Check edits after refresh and from another signed-in account. *(Manual browser check reported passed: saved changes persisted after refresh and were visible to another signed-in account.)*
 
 ### M2-L3 — Laica: Profile image storage
 
 - [ ] **M2-L3.1** Validate avatar and cover file type/content and the 5 MB size limit on the server.
-- [ ] **M2-L3.2** Upload the accepted image to Cloudinary and save its asset ID to the correct profile field.
+- [ ] **M2-L3.2** Upload the accepted image to Cloudinary and save its public ID to the correct profile field.
 - [ ] **M2-L3.3** Delete the old asset after successful replacement and the new asset if the database update fails.
 - [ ] **M2-L3.4** Check upload, replacement, invalid file, and persistence after server restart.
 

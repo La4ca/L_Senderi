@@ -6,10 +6,14 @@ import request from "supertest";
 import { hashSessionToken, SESSION_COOKIE_NAME } from "../src/auth/session";
 import { errorHandler } from "../src/middleware/error-handler";
 import { notFoundHandler } from "../src/middleware/not-found";
-import { type SessionDocument, type UserDocument } from "../src/db/documents";
+import { type FriendshipDocument, type SessionDocument, type UserDocument } from "../src/db/documents";
 import { createUsersRouter } from "../src/routes/users";
 
-function createDatabase(users: UserDocument[], sessions: SessionDocument[]): Db {
+function createDatabase(
+  users: UserDocument[],
+  sessions: SessionDocument[],
+  friendships: FriendshipDocument[],
+): Db {
   return {
     collection: (name: string) => {
       if (name === "users") {
@@ -25,6 +29,15 @@ function createDatabase(users: UserDocument[], sessions: SessionDocument[]): Db 
             Object.assign(user, $set);
             return user;
           },
+        };
+      }
+
+      if (name === "friendships") {
+        return {
+          findOne: async ({ userIdLow, userIdHigh }: Pick<FriendshipDocument, "userIdLow" | "userIdHigh">) =>
+            friendships.find((friendship) =>
+              friendship.userIdLow.equals(userIdLow) && friendship.userIdHigh.equals(userIdHigh),
+            ) ?? null,
         };
       }
 
@@ -50,8 +63,12 @@ function makeUser(email: string, displayName: string): UserDocument {
   };
 }
 
-function createTestApp(users: UserDocument[], sessions: SessionDocument[]) {
-  const database = createDatabase(users, sessions);
+function createTestApp(
+  users: UserDocument[],
+  sessions: SessionDocument[],
+  options: { friendships?: FriendshipDocument[]; cloudinaryCloudName?: string } = {},
+) {
+  const database = createDatabase(users, sessions, options.friendships ?? []);
   const app = express();
   app.use(express.json());
   app.use(
@@ -59,6 +76,7 @@ function createTestApp(users: UserDocument[], sessions: SessionDocument[]) {
     createUsersRouter({
       getDatabase: () => database,
       getAllowedOrigins: () => ["http://localhost:5173"],
+      getCloudinaryCloudName: () => options.cloudinaryCloudName,
       now: () => new Date("2026-10-01T01:00:00.000Z"),
     }),
   );
@@ -77,6 +95,18 @@ function sessionFor(user: UserDocument, token = "profile-session-token"): Sessio
   };
 }
 
+function friendshipFor(first: UserDocument, second: UserDocument): FriendshipDocument {
+  const [userIdLow, userIdHigh] = [first._id, second._id].sort((left, right) =>
+    left.toHexString().localeCompare(right.toHexString()),
+  );
+  return {
+    _id: new ObjectId(),
+    userIdLow,
+    userIdHigh,
+    createdAt: new Date("2026-10-01T00:00:00.000Z"),
+  };
+}
+
 test("signed-in users can read a profile without private email data", async () => {
   const owner = makeUser("owner@example.com", "Owner Example");
   const viewer = makeUser("viewer@example.com", "Viewer Example");
@@ -92,6 +122,44 @@ test("signed-in users can read a profile without private email data", async () =
   assert.equal(response.body.friendshipStatus, "none");
   assert.equal("email" in response.body.user, false);
   assert.equal(response.headers["cache-control"], "private, no-store");
+});
+
+test("profile reads report accepted friendship and build profile image URLs from Cloudinary public IDs", async () => {
+  const owner = makeUser("owner@example.com", "Owner Example");
+  owner.avatarId = "profiles/owner/avatar";
+  owner.coverId = "profiles/owner/cover";
+  const viewer = makeUser("viewer@example.com", "Viewer Example");
+  const app = createTestApp([owner, viewer], [sessionFor(viewer)], {
+    friendships: [friendshipFor(owner, viewer)],
+    cloudinaryCloudName: "senderi-demo",
+  });
+
+  const response = await request(app)
+    .get(`/api/users/${owner._id.toHexString()}`)
+    .set("Cookie", `${SESSION_COOKIE_NAME}=profile-session-token`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.friendshipStatus, "friends");
+  assert.equal(
+    response.body.user.avatarUrl,
+    "https://res.cloudinary.com/senderi-demo/image/upload/c_fill,g_face,h_256,w_256/f_auto/q_auto/profiles/owner/avatar",
+  );
+  assert.equal(
+    response.body.user.coverUrl,
+    "https://res.cloudinary.com/senderi-demo/image/upload/c_fill,g_auto,h_480,w_1600/f_auto/q_auto/profiles/owner/cover",
+  );
+});
+
+test("profile reads report self for the signed-in user's own profile", async () => {
+  const owner = makeUser("owner@example.com", "Owner Example");
+  const app = createTestApp([owner], [sessionFor(owner)]);
+
+  const response = await request(app)
+    .get(`/api/users/${owner._id.toHexString()}`)
+    .set("Cookie", `${SESSION_COOKIE_NAME}=profile-session-token`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.friendshipStatus, "self");
 });
 
 test("profile edits only change the account identified by the authenticated session", async () => {
